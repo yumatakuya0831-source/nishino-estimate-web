@@ -15,6 +15,8 @@ type AppContextValue = {
   isAdmin: boolean;
   session: Session | null;
   authLoading: boolean;
+  dataLoading: boolean;
+  dataLoadingLabel: string;
   signOut: () => Promise<void>;
 };
 
@@ -24,6 +26,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [data, setDataState] = useState<AppData>(() => loadData());
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(Boolean(supabase));
+  const [dataLoading, setDataLoading] = useState(false);
+  const [dataLoadingLabel, setDataLoadingLabel] = useState("");
 
   useEffect(() => {
     const client = supabase;
@@ -102,12 +106,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const client = supabase;
     if (!client || !session) {
+      setDataLoading(false);
+      setDataLoadingLabel("");
       return;
     }
 
     let cancelled = false;
 
     const loadPriceItems = async () => {
+      setDataLoading(true);
+      setDataLoadingLabel("顧客・工種・会社情報を取得しています");
       const [{ data: customerRows, error: customersError }, { data: categoryRows, error: categoriesError }, { data: companyRows, error: companyError }] =
         await Promise.all([
           client
@@ -164,6 +172,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         : null;
 
       const [{ data: estimateRows, error: estimatesError }, { data: estimateItemRows, error: estimateItemsError }] =
+        (setDataLoadingLabel("見積データを取得しています"),
         await Promise.all([
           client
             .from("estimates")
@@ -177,7 +186,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
               "id, estimate_id, work_category_id, price_item_id, name, specification, quantity, unit, material_cost, labor_cost, expense, unit_price, amount, memo, sort_order",
             )
             .order("sort_order", { ascending: true }),
-        ]);
+        ]));
 
       if (estimatesError) {
         console.error("Failed to load estimates from Supabase", estimatesError);
@@ -227,6 +236,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       for (let from = 0; ; from += pageSize) {
         const to = from + pageSize - 1;
+        setDataLoadingLabel(`単価マスタを取得しています（${loadedItems.length.toLocaleString()}件読込済み）`);
         const { data: rows, error } = await client
           .from("price_items")
           .select(
@@ -238,6 +248,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
         if (error) {
           console.error("Failed to load price items from Supabase", error);
+          if (!cancelled) {
+            setDataLoading(false);
+            setDataLoadingLabel("");
+          }
           return;
         }
 
@@ -278,6 +292,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           estimates: loadedEstimates.length > 0 ? loadedEstimates : current.estimates,
           priceItems: loadedItems.length > 0 ? loadedItems : current.priceItems,
         }));
+        setDataLoading(false);
+        setDataLoadingLabel("");
       }
     };
 
@@ -310,9 +326,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       isAdmin: activeProfile?.role === "admin",
       session,
       authLoading,
+      dataLoading,
+      dataLoadingLabel,
       signOut,
     }),
-    [activeProfile?.role, authLoading, data, session],
+    [activeProfile?.role, authLoading, data, dataLoading, dataLoadingLabel, session],
   );
 
   if (authLoading) {

@@ -8,7 +8,7 @@ import type { CompanySettings, Customer, PriceItem, WorkCategory } from "@/types
 type MasterTab = "customers" | "prices" | "categories" | "company" | "users";
 
 export function MasterManager() {
-  const { data, setData, isAdmin } = useAppData();
+  const { data, setData, isAdmin, dataLoading, dataLoadingLabel } = useAppData();
   const [tab, setTab] = useState<MasterTab>("customers");
   const [message, setMessage] = useState("");
 
@@ -176,6 +176,16 @@ export function MasterManager() {
           </button>
         ))}
       </div>
+
+      {dataLoading && (
+        <div className="loading-box" role="status" aria-live="polite" style={{ marginBottom: 16 }}>
+          <span className="loading-spinner" aria-hidden="true" />
+          <div>
+            <strong>{dataLoadingLabel || "マスタデータを取得しています"}</strong>
+            <p className="muted">Supabaseから最新データを読み込んでいます。表示が更新されるまでお待ちください。</p>
+          </div>
+        </div>
+      )}
 
       {message && <p className={message.includes("失敗") ? "error-text" : "muted"}>{message}</p>}
 
