@@ -10,6 +10,8 @@ type MasterTab = "customers" | "prices" | "categories" | "company" | "users";
 export function MasterManager() {
   const { data, setData, isAdmin, dataLoading, dataLoadingLabel } = useAppData();
   const [tab, setTab] = useState<MasterTab>("customers");
+  const [tabLoading, setTabLoading] = useState(false);
+  const [tabLoadingLabel, setTabLoadingLabel] = useState("");
   const [message, setMessage] = useState("");
 
   const disabled = !isAdmin;
@@ -153,6 +155,22 @@ export function MasterManager() {
     void persistPrice(item);
   };
 
+  const changeTab = (nextTab: MasterTab, label: string) => {
+    if (nextTab === tab) {
+      return;
+    }
+
+    setTabLoading(true);
+    setTabLoadingLabel(`${label}マスタを表示しています`);
+    window.setTimeout(() => {
+      setTab(nextTab);
+      window.setTimeout(() => {
+        setTabLoading(false);
+        setTabLoadingLabel("");
+      }, nextTab === "prices" ? 500 : 180);
+    }, 30);
+  };
+
   return (
     <>
       <div className="page-header">
@@ -171,18 +189,28 @@ export function MasterManager() {
           ["company", "会社情報"],
           ["users", "ユーザー"],
         ].map(([key, label]) => (
-          <button className={tab === key ? "button" : "button secondary"} key={key} type="button" onClick={() => setTab(key as MasterTab)}>
+          <button
+            className={tab === key ? "button" : "button secondary"}
+            disabled={tabLoading}
+            key={key}
+            type="button"
+            onClick={() => changeTab(key as MasterTab, label)}
+          >
             {label}
           </button>
         ))}
       </div>
 
-      {dataLoading && (
+      {(dataLoading || tabLoading) && (
         <div className="loading-box" role="status" aria-live="polite" style={{ marginBottom: 16 }}>
           <span className="loading-spinner" aria-hidden="true" />
           <div>
-            <strong>{dataLoadingLabel || "マスタデータを取得しています"}</strong>
-            <p className="muted">Supabaseから最新データを読み込んでいます。表示が更新されるまでお待ちください。</p>
+            <strong>{dataLoading ? dataLoadingLabel || "マスタデータを取得しています" : tabLoadingLabel}</strong>
+            <p className="muted">
+              {dataLoading
+                ? "Supabaseから最新データを読み込んでいます。表示が更新されるまでお待ちください。"
+                : "一覧を描画しています。表示が完了するまでお待ちください。"}
+            </p>
           </div>
         </div>
       )}
