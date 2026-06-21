@@ -59,7 +59,11 @@ export function PriceImportManager() {
   const { data, setData, isAdmin, session } = useAppData();
   const [year, setYear] = useState(new Date().getFullYear());
   const [message, setMessage] = useState("");
-  const latestBatch = data.priceImportBatches[0];
+  const [isLoading, setIsLoading] = useState(false);
+  const [previewBatchId, setPreviewBatchId] = useState<string | null>(null);
+  const latestBatch = previewBatchId
+    ? data.priceImportBatches.find((batch) => batch.id === previewBatchId)
+    : undefined;
 
   if (!isAdmin) {
     return (
@@ -119,6 +123,7 @@ export function PriceImportManager() {
     };
 
     setData((current) => ({ ...current, priceImportBatches: [batch, ...current.priceImportBatches] }));
+    setPreviewBatchId(batchId);
     setMessage(
       `${parsedItems.length}件を解析しました。追加${counts.add}件、更新${counts.update}件、削除候補${counts.deleteCandidate}件、確認${counts.uncertain}件です。`,
     );
@@ -164,6 +169,8 @@ export function PriceImportManager() {
     }
 
     try {
+      setIsLoading(true);
+      setPreviewBatchId(null);
       const lowerName = file.name.toLowerCase();
       if (lowerName.endsWith(".xlsx") || lowerName.endsWith(".xls")) {
         await handleExcelFile(file);
@@ -178,6 +185,8 @@ export function PriceImportManager() {
       setMessage("PDF、xlsx、xls のいずれかを選択してください。");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "単価取込に失敗しました。");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -279,13 +288,19 @@ export function PriceImportManager() {
         <div className="grid cols-3">
           <div className="field">
             <label>対象年度</label>
-            <input className="input" type="number" value={year} onChange={(event) => setYear(Number(event.target.value))} />
+            <input
+              className="input"
+              disabled={isLoading}
+              type="number"
+              value={year}
+              onChange={(event) => setYear(Number(event.target.value))}
+            />
           </div>
           <div className="field" style={{ gridColumn: "span 2" }}>
             <label>単価ファイル</label>
             <input
               className="input"
-              disabled={!isAdmin}
+              disabled={!isAdmin || isLoading}
               type="file"
               accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/pdf"
               onChange={(event) => {
@@ -297,11 +312,20 @@ export function PriceImportManager() {
             />
           </div>
         </div>
+        {isLoading && (
+          <div className="loading-box" role="status" aria-live="polite">
+            <span className="loading-spinner" aria-hidden="true" />
+            <div>
+              <strong>ファイルを読み込んでいます</strong>
+              <p className="muted">解析と差分確認データの作成を行っています。完了するまでこの画面でお待ちください。</p>
+            </div>
+          </div>
+        )}
         {message && <p className={message.includes("失敗") ? "error-text" : "muted"}>{message}</p>}
         <p className="muted">Excelは「データベース」シートを優先して読み込みます。削除候補は実削除せず、単価マスタを無効化します。</p>
       </section>
 
-      {latestBatch && (
+      {latestBatch && !isLoading && (
         <section className="panel" style={{ marginTop: 16 }}>
           <div className="toolbar" style={{ justifyContent: "space-between", marginBottom: 12 }}>
             <div>

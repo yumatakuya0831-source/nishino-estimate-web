@@ -259,6 +259,37 @@ th {
   margin: 0;
 }
 
+.loading-box {
+  align-items: center;
+  background: var(--accent-soft);
+  border: 1px solid #b6e3ec;
+  border-radius: 8px;
+  display: flex;
+  gap: 14px;
+  margin-top: 16px;
+  padding: 14px;
+}
+
+.loading-box p {
+  margin: 4px 0 0;
+}
+
+.loading-spinner {
+  animation: spin 0.9s linear infinite;
+  border: 3px solid #b6e3ec;
+  border-top-color: var(--accent);
+  border-radius: 999px;
+  flex: 0 0 auto;
+  height: 28px;
+  width: 28px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .estimate-paper {
   background: #ffffff;
   color: #111827;
