@@ -20,12 +20,16 @@ export function PriceImportManager() {
       const pdfjs = await import("pdfjs-dist");
       pdfjs.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.mjs", import.meta.url).toString();
       const buffer = await file.arrayBuffer();
-      const pdf = await pdfjs.getDocument({ data: buffer }).promise;
+      const pdf = await pdfjs.getDocument({
+        data: buffer,
+        cMapPacked: true,
+        cMapUrl: "/cmaps/",
+      }).promise;
       const texts: string[] = [];
       for (let pageNo = 1; pageNo <= pdf.numPages; pageNo += 1) {
         const page = await pdf.getPage(pageNo);
         const content = await page.getTextContent();
-        texts.push(content.items.map((item) => ("str" in item ? item.str : "")).join("\n"));
+        texts.push(content.items.map((item) => ("str" in item ? item.str : "")).join(" "));
       }
       const parsedItems = parsePriceRowsFromText(texts.join("\n"), year);
       const diffs = createPriceDiffs(data.priceItems, parsedItems);
