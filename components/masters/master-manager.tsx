@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAppData } from "@/components/app-provider";
 import { supabase } from "@/lib/supabase/client";
 import type { CompanySettings, Customer, PriceItem, WorkCategory } from "@/types/domain";
@@ -12,9 +12,33 @@ export function MasterManager() {
   const [tab, setTab] = useState<MasterTab>("customers");
   const [tabLoading, setTabLoading] = useState(false);
   const [tabLoadingLabel, setTabLoadingLabel] = useState("");
+  const [priceSearch, setPriceSearch] = useState("");
+  const [priceYearFilter, setPriceYearFilter] = useState("all");
+  const [priceActiveFilter, setPriceActiveFilter] = useState<"all" | "active" | "inactive">("active");
   const [message, setMessage] = useState("");
 
   const disabled = !isAdmin;
+  const priceYears = useMemo(
+    () => Array.from(new Set(data.priceItems.map((item) => item.year))).sort((a, b) => b - a),
+    [data.priceItems],
+  );
+  const filteredPriceItems = useMemo(() => {
+    const keyword = priceSearch.trim().toLocaleLowerCase("ja-JP");
+
+    return data.priceItems.filter((item) => {
+      const matchesYear = priceYearFilter === "all" || item.year === Number(priceYearFilter);
+      const matchesActive =
+        priceActiveFilter === "all" ||
+        (priceActiveFilter === "active" && item.active) ||
+        (priceActiveFilter === "inactive" && !item.active);
+      const targetText = [item.name, item.specification, item.note, item.construction, item.unit]
+        .join(" ")
+        .toLocaleLowerCase("ja-JP");
+      const matchesKeyword = keyword === "" || targetText.includes(keyword);
+
+      return matchesYear && matchesActive && matchesKeyword;
+    });
+  }, [data.priceItems, priceActiveFilter, priceSearch, priceYearFilter]);
 
   if (!isAdmin) {
     return (
@@ -274,6 +298,43 @@ export function MasterManager() {
               単価追加
             </button>
           </div>
+          <div className="grid cols-3" style={{ marginBottom: 12 }}>
+            <div className="field">
+              <label>キーワード</label>
+              <input
+                className="input"
+                placeholder="名称・摘要・備考・施工"
+                value={priceSearch}
+                onChange={(event) => setPriceSearch(event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label>年度</label>
+              <select className="select" value={priceYearFilter} onChange={(event) => setPriceYearFilter(event.target.value)}>
+                <option value="all">すべて</option>
+                {priceYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label>有効状態</label>
+              <select
+                className="select"
+                value={priceActiveFilter}
+                onChange={(event) => setPriceActiveFilter(event.target.value as "all" | "active" | "inactive")}
+              >
+                <option value="active">有効のみ</option>
+                <option value="inactive">無効のみ</option>
+                <option value="all">すべて</option>
+              </select>
+            </div>
+          </div>
+          <p className="muted">
+            {filteredPriceItems.length.toLocaleString()}件 / 全{data.priceItems.length.toLocaleString()}件
+          </p>
           <div className="table-wrap">
             <table>
               <thead>
@@ -294,7 +355,7 @@ export function MasterManager() {
                 </tr>
               </thead>
               <tbody>
-                {data.priceItems.map((item) => (
+                {filteredPriceItems.map((item) => (
                   <tr key={item.id}>
                     <td><input className="input" disabled={disabled} type="number" value={item.year} onBlur={() => void persistPrice(item)} onChange={(event) => updatePrice(item.id, { year: Number(event.target.value) })} /></td>
                     <td><input className="input" disabled={disabled} type="number" value={item.pageNo} onBlur={() => void persistPrice(item)} onChange={(event) => updatePrice(item.id, { pageNo: Number(event.target.value) })} /></td>
