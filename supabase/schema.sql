@@ -42,6 +42,12 @@ create table company_settings (
   estimate_number_pattern text not null default 'YYYY-0001'
 );
 
+create table estimate_number_sequences (
+  year integer primary key,
+  current_value integer not null default 0,
+  updated_at timestamptz not null default now()
+);
+
 create table price_items (
   id uuid primary key default gen_random_uuid(),
   year integer not null,
@@ -81,6 +87,8 @@ create table estimates (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create unique index if not exists estimates_estimate_no_idx on estimates (estimate_no);
 
 create table estimate_items (
   id uuid primary key default gen_random_uuid(),
@@ -125,6 +133,7 @@ alter table profiles enable row level security;
 alter table customers enable row level security;
 alter table work_categories enable row level security;
 alter table company_settings enable row level security;
+alter table estimate_number_sequences enable row level security;
 alter table price_items enable row level security;
 alter table estimates enable row level security;
 alter table estimate_items enable row level security;
@@ -156,6 +165,8 @@ create policy "admins manage work categories" on work_categories for all to auth
 create policy "authenticated read company settings" on company_settings for select to authenticated using (true);
 create policy "admins manage company settings" on company_settings for all to authenticated using (is_admin()) with check (is_admin());
 
+create policy "authenticated read estimate number sequences" on estimate_number_sequences for select to authenticated using (true);
+
 create policy "authenticated read price items" on price_items for select to authenticated using (true);
 create policy "admins manage price items" on price_items for all to authenticated using (is_admin()) with check (is_admin());
 
@@ -164,6 +175,59 @@ create policy "authenticated manage estimate items" on estimate_items for all to
 
 create policy "admins manage import batches" on price_import_batches for all to authenticated using (is_admin()) with check (is_admin());
 create policy "admins manage import diffs" on price_import_diffs for all to authenticated using (is_admin()) with check (is_admin());
+
+create or replace function next_estimate_number(pattern_arg text default 'YYYY-0001')
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_year integer := extract(year from now())::integer;
+  target_month text := to_char(now(), 'MM');
+  next_value integer;
+  result text;
+begin
+  insert into estimate_number_sequences (year, current_value, updated_at)
+  values (target_year, 1, now())
+  on conflict (year) do update set
+    current_value = estimate_number_sequences.current_value + 1,
+    updated_at = now()
+  returning current_value into next_value;
+
+  result := replace(pattern_arg, 'YYYY', target_year::text);
+  result := replace(result, 'MM', target_month);
+  result := replace(result, '0001', lpad(next_value::text, 4, '0'));
+
+  return result;
+end;
+$$;
+
+grant execute on function next_estimate_number(text) to authenticated;
+
+create or replace function handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into profiles (id, name, role)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data ->> 'name', split_part(new.email, '@', 1), 'user'),
+    'user'
+  )
+  on conflict (id) do nothing;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function handle_new_user();
 
 insert into work_categories (id, name, sort_order, active) values
   ('water', '給水設備工事', 1, true),

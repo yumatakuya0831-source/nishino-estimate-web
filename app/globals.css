@@ -234,12 +234,36 @@ th {
   color: var(--muted);
 }
 
+.auth-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 10vh auto 0;
+  max-width: 440px;
+  padding: 24px;
+}
+
+.auth-card h1 {
+  font-size: 26px;
+  margin: 0 0 8px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.error-text {
+  color: var(--danger);
+  margin: 0;
+}
+
 .estimate-paper {
   background: #ffffff;
   color: #111827;
   margin: 0 auto;
   max-width: 980px;
-  padding: 30px;
 }
 
 .paper-title {
@@ -249,11 +273,42 @@ th {
   text-decoration: underline;
 }
 
+.print-page {
+  background: #ffffff;
+  margin: 0 auto 18px;
+  min-height: 297mm;
+  padding: 14mm;
+  page-break-after: always;
+  width: 210mm;
+}
+
+.print-page:last-child {
+  page-break-after: auto;
+}
+
+.paper-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 18px;
+}
+
 .paper-grid {
   display: grid;
   grid-template-columns: 1fr 330px;
   gap: 24px;
   margin-top: 18px;
+}
+
+.customer-name {
+  border-bottom: 1px solid #111827;
+  font-size: 22px;
+  font-weight: 700;
+  margin: 28px 0 18px;
+  padding-bottom: 8px;
+}
+
+.company-block {
+  line-height: 1.7;
 }
 
 .paper-table th,
@@ -262,9 +317,27 @@ th {
   padding: 6px 8px;
 }
 
+.paper-table th {
+  background: #f3f4f6;
+}
+
+.summary-table th {
+  width: 120px;
+}
+
+.grand-total {
+  font-size: 22px;
+  font-weight: 800;
+}
+
 .paper-section {
   break-inside: avoid;
   margin-top: 24px;
+}
+
+.detail-title {
+  border-bottom: 2px solid #111827;
+  padding-bottom: 6px;
 }
 
 @media (max-width: 900px) {
@@ -303,6 +376,16 @@ th {
 
   .estimate-paper {
     max-width: none;
-    padding: 12mm;
+  }
+
+  .print-page {
+    margin: 0;
+    min-height: auto;
+    padding: 10mm;
+    width: auto;
+  }
+
+  .paper-table {
+    font-size: 11px;
   }
 }

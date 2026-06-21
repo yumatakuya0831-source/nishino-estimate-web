@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Estimate, EstimateItem, WorkCategoryKey } from "@/types/domain";
 import { useAppData } from "@/components/app-provider";
+import { supabase } from "@/lib/supabase/client";
 import {
   createEstimateItemFromPriceItem,
   formatCurrency,
@@ -22,7 +23,7 @@ type EstimateEditorProps = {
 
 export function EstimateEditor({ estimateId }: EstimateEditorProps) {
   const router = useRouter();
-  const { data, setData } = useAppData();
+  const { data, setData, session } = useAppData();
   const existingEstimate = estimateId ? data.estimates.find((estimate) => estimate.id === estimateId) : undefined;
   const [selectedCategory, setSelectedCategory] = useState<WorkCategoryKey>("water");
   const [priceQuery, setPriceQuery] = useState("");
@@ -49,6 +50,30 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
       items: [],
     };
   });
+  const requestedEstimateNo = useRef(false);
+
+  useEffect(() => {
+    const client = supabase;
+    if (estimateId || existingEstimate || requestedEstimateNo.current || !client || !session) {
+      return;
+    }
+
+    requestedEstimateNo.current = true;
+    const assignEstimateNumber = async () => {
+      const { data: nextNo, error } = await client.rpc("next_estimate_number", {
+        pattern_arg: data.companySettings.estimateNumberPattern,
+      });
+
+      if (error || typeof nextNo !== "string") {
+        console.error("Failed to generate estimate number", error);
+        return;
+      }
+
+      setEstimate((current) => ({ ...current, estimateNo: nextNo }));
+    };
+
+    void assignEstimateNumber();
+  }, [data.companySettings.estimateNumberPattern, estimateId, existingEstimate, session]);
 
   const filteredPriceItems = useMemo(() => {
     const query = priceQuery.trim().toLowerCase();
@@ -113,8 +138,65 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
     setEstimate((current) => ({ ...current, items: current.items.filter((item) => item.id !== itemId) }));
   };
 
-  const saveEstimate = () => {
+  const saveEstimate = async () => {
     const saved = { ...estimate, updatedAt: new Date().toISOString() };
+
+    if (supabase && session) {
+      const { error: estimateError } = await supabase.from("estimates").upsert({
+        id: saved.id,
+        estimate_no: saved.estimateNo,
+        customer_id: saved.customerId || null,
+        customer_name_snapshot: saved.customerNameSnapshot,
+        customer_honorific_snapshot: saved.customerHonorificSnapshot,
+        price_coefficient_snapshot: saved.priceCoefficientSnapshot,
+        project_name: saved.projectName,
+        payment_terms: saved.paymentTerms,
+        valid_until: saved.validUntil || null,
+        expense_rate: saved.expenseRate,
+        status: saved.status,
+        created_by: session.user.id,
+        updated_at: saved.updatedAt,
+      });
+
+      if (estimateError) {
+        window.alert(`見積の保存に失敗しました: ${estimateError.message}`);
+        return;
+      }
+
+      const { error: deleteError } = await supabase.from("estimate_items").delete().eq("estimate_id", saved.id);
+      if (deleteError) {
+        window.alert(`見積明細の更新に失敗しました: ${deleteError.message}`);
+        return;
+      }
+
+      if (saved.items.length > 0) {
+        const { error: itemsError } = await supabase.from("estimate_items").insert(
+          saved.items.map((item) => ({
+            id: item.id,
+            estimate_id: saved.id,
+            work_category_id: item.workCategoryId,
+            price_item_id: item.priceItemId || null,
+            name: item.name,
+            specification: item.specification,
+            quantity: item.quantity,
+            unit: item.unit,
+            material_cost: item.materialCost,
+            labor_cost: item.laborCost,
+            expense: item.expense,
+            unit_price: item.unitPrice,
+            amount: item.amount,
+            memo: item.memo,
+            sort_order: item.sortOrder,
+          })),
+        );
+
+        if (itemsError) {
+          window.alert(`見積明細の保存に失敗しました: ${itemsError.message}`);
+          return;
+        }
+      }
+    }
+
     setData((current) => ({
       ...current,
       estimates: current.estimates.some((item) => item.id === saved.id)

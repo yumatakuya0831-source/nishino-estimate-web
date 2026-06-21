@@ -2,14 +2,14 @@ import type { PriceImportDiff, PriceItem } from "@/types/domain";
 
 const numberPattern = /^[-+]?\d[\d,]*$/;
 const pageNumberPattern = /^\d{1,4}$/;
-const specTokenPattern = /[A-Za-zＡ-Ｚａ-ｚ0-9０-９φΦ]/;
+const specTokenPattern = /[A-Za-z0-9Ａ-Ｚａ-ｚ０-９（(]/;
+const japaneseTextPattern = /[ぁ-んァ-ン一-龠]/;
 const unitTokens = new Set([
   "m",
   "M",
   "ｍ",
-  "Ｍ",
-  "本",
   "個",
+  "本",
   "組",
   "台",
   "基",
@@ -18,7 +18,6 @@ const unitTokens = new Set([
   "箇所",
   "か所",
   "ヶ所",
-  "ケ所",
   "人",
   "日",
   "時間",
@@ -31,7 +30,6 @@ const unitTokens = new Set([
   "㎥",
   "セット",
 ]);
-const japaneseTextPattern = /[一-龥ぁ-んァ-ヶ]/;
 
 function toNumber(value: string | undefined): number {
   if (!value) {
@@ -53,10 +51,7 @@ function normalizeToken(value: string): string {
 }
 
 function isUnitToken(value: string | undefined): boolean {
-  if (!value) {
-    return false;
-  }
-  return unitTokens.has(value.trim());
+  return Boolean(value && unitTokens.has(value.trim()));
 }
 
 function splitDescription(tokens: string[]) {
@@ -162,16 +157,59 @@ export function parsePriceRowsFromText(text: string, year: number): PriceItem[] 
   return parsed;
 }
 
+function cellText(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  return String(value).trim();
+}
+
+function cellNumber(value: unknown): number {
+  if (value === null || value === undefined || value === "") {
+    return 0;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+  const parsed = Number(String(value).replaceAll(",", "").trim());
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+export function parsePriceRowsFromSheetRows(rows: unknown[][], year: number): PriceItem[] {
+  return rows
+    .slice(1)
+    .map((row, index) => {
+      const pageNo = cellNumber(row[0]) || index + 1;
+      return {
+        id: crypto.randomUUID(),
+        year,
+        pageNo,
+        name: cellText(row[1]),
+        specification: cellText(row[2]),
+        note: cellText(row[3]),
+        construction: cellText(row[4]),
+        unit: cellText(row[5]) || "式",
+        materialUnitPrice: cellNumber(row[6]),
+        materialCost: cellNumber(row[7]),
+        laborCost: cellNumber(row[8]),
+        expense: cellNumber(row[9]),
+        compositeUnitPrice: cellNumber(row[10]),
+        active: true,
+      };
+    })
+    .filter((item) => item.name || item.specification || item.unit)
+    .filter((item) => item.name !== "名称" && item.name !== "名        称");
+}
+
 export function createPriceDiffs(currentItems: PriceItem[], parsedItems: PriceItem[]): PriceImportDiff[] {
-  return parsedItems.map((parsed) => {
-    const current = currentItems.find(
-      (item) =>
-        item.year === parsed.year &&
-        item.name === parsed.name &&
-        item.specification === parsed.specification &&
-        item.note === parsed.note &&
-        item.construction === parsed.construction,
-    );
+  const keyOf = (item: Pick<PriceItem, "year" | "name" | "specification" | "note" | "construction" | "unit">) =>
+    [item.year, item.name.trim(), item.specification.trim(), item.note.trim(), item.construction.trim(), item.unit.trim()].join("\u001f");
+
+  const currentByKey = new Map(currentItems.map((item) => [keyOf(item), item]));
+  const parsedKeys = new Set(parsedItems.map((item) => keyOf(item)));
+
+  const diffs: PriceImportDiff[] = parsedItems.map((parsed) => {
+    const current = currentByKey.get(keyOf(parsed));
 
     if (!current) {
       return {
@@ -185,10 +223,13 @@ export function createPriceDiffs(currentItems: PriceItem[], parsedItems: PriceIt
     }
 
     const changed =
+      current.pageNo !== parsed.pageNo ||
+      current.materialUnitPrice !== parsed.materialUnitPrice ||
       current.materialCost !== parsed.materialCost ||
       current.laborCost !== parsed.laborCost ||
       current.expense !== parsed.expense ||
-      current.compositeUnitPrice !== parsed.compositeUnitPrice;
+      current.compositeUnitPrice !== parsed.compositeUnitPrice ||
+      current.active !== parsed.active;
 
     return {
       id: crypto.randomUUID(),
@@ -197,7 +238,22 @@ export function createPriceDiffs(currentItems: PriceItem[], parsedItems: PriceIt
       parsedData: { ...parsed, id: current.id },
       selected: changed,
       confidence: changed ? 0.9 : 0.55,
-      reason: changed ? "単価差分があります。" : "既存マスタと同値、または確認不要の可能性があります。",
+      reason: changed ? "単価またはページ情報に差分があります。" : "既存マスタと同じ内容です。",
     };
   });
+
+  const parsedYears = new Set(parsedItems.map((item) => item.year));
+  const deleteCandidates: PriceImportDiff[] = currentItems
+    .filter((item) => item.active && parsedYears.has(item.year) && !parsedKeys.has(keyOf(item)))
+    .map((item) => ({
+      id: crypto.randomUUID(),
+      diffType: "delete_candidate",
+      currentItemId: item.id,
+      parsedData: { ...item, active: false },
+      selected: false,
+      confidence: 0.65,
+      reason: "取込データ側に一致する項目がありません。削除候補として確認してください。",
+    }));
+
+  return [...diffs, ...deleteCandidates];
 }
