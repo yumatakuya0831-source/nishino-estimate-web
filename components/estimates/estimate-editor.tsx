@@ -21,12 +21,19 @@ type EstimateEditorProps = {
   estimateId?: string;
 };
 
+function uniqueOptions(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ja-JP"));
+}
+
 export function EstimateEditor({ estimateId }: EstimateEditorProps) {
   const router = useRouter();
   const { data, setData, session } = useAppData();
   const existingEstimate = estimateId ? data.estimates.find((estimate) => estimate.id === estimateId) : undefined;
   const [selectedCategory, setSelectedCategory] = useState<WorkCategoryKey>("water");
-  const [priceQuery, setPriceQuery] = useState("");
+  const [priceNameFilter, setPriceNameFilter] = useState("");
+  const [priceSpecificationFilter, setPriceSpecificationFilter] = useState("");
+  const [priceConstructionFilter, setPriceConstructionFilter] = useState("");
+  const [priceKeyword, setPriceKeyword] = useState("");
 
   const [estimate, setEstimate] = useState<Estimate>(() => {
     if (existingEstimate) {
@@ -75,21 +82,64 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
     void assignEstimateNumber();
   }, [data.companySettings.estimateNumberPattern, estimateId, existingEstimate, session]);
 
+  const activePriceItems = useMemo(() => data.priceItems.filter((item) => item.active), [data.priceItems]);
+  const priceNameOptions = useMemo(() => uniqueOptions(activePriceItems.map((item) => item.name)), [activePriceItems]);
+  const priceSpecificationOptions = useMemo(
+    () =>
+      uniqueOptions(
+        activePriceItems
+          .filter((item) => !priceNameFilter || item.name === priceNameFilter)
+          .map((item) => item.specification),
+      ),
+    [activePriceItems, priceNameFilter],
+  );
+  const priceConstructionOptions = useMemo(
+    () =>
+      uniqueOptions(
+        activePriceItems
+          .filter((item) => !priceNameFilter || item.name === priceNameFilter)
+          .filter((item) => !priceSpecificationFilter || item.specification === priceSpecificationFilter)
+          .map((item) => item.construction),
+      ),
+    [activePriceItems, priceNameFilter, priceSpecificationFilter],
+  );
+  const filteredPriceItemCount = useMemo(() => {
+    const keyword = priceKeyword.trim().toLocaleLowerCase("ja-JP");
+    return activePriceItems.filter((item) => {
+      const matchesName = !priceNameFilter || item.name === priceNameFilter;
+      const matchesSpecification = !priceSpecificationFilter || item.specification === priceSpecificationFilter;
+      const matchesConstruction = !priceConstructionFilter || item.construction === priceConstructionFilter;
+      const matchesKeyword =
+        !keyword ||
+        [item.name, item.specification, item.note, item.construction].join(" ").toLocaleLowerCase("ja-JP").includes(keyword);
+
+      return matchesName && matchesSpecification && matchesConstruction && matchesKeyword;
+    }).length;
+  }, [activePriceItems, priceConstructionFilter, priceKeyword, priceNameFilter, priceSpecificationFilter]);
   const filteredPriceItems = useMemo(() => {
-    const query = priceQuery.trim().toLowerCase();
-    return data.priceItems
-      .filter((item) => item.active)
+    const keyword = priceKeyword.trim().toLocaleLowerCase("ja-JP");
+    return activePriceItems
+      .filter((item) => !priceNameFilter || item.name === priceNameFilter)
+      .filter((item) => !priceSpecificationFilter || item.specification === priceSpecificationFilter)
+      .filter((item) => !priceConstructionFilter || item.construction === priceConstructionFilter)
       .filter((item) => {
-        if (!query) {
+        if (!keyword) {
           return true;
         }
         return [item.name, item.specification, item.note, item.construction]
           .join(" ")
-          .toLowerCase()
-          .includes(query);
+          .toLocaleLowerCase("ja-JP")
+          .includes(keyword);
       })
-      .slice(0, 20);
-  }, [data.priceItems, priceQuery]);
+      .slice(0, 50);
+  }, [activePriceItems, priceConstructionFilter, priceKeyword, priceNameFilter, priceSpecificationFilter]);
+
+  const resetPriceFilters = () => {
+    setPriceNameFilter("");
+    setPriceSpecificationFilter("");
+    setPriceConstructionFilter("");
+    setPriceKeyword("");
+  };
 
   const selectCustomer = (customerId: string) => {
     const customer = data.customers.find((item) => item.id === customerId);
@@ -309,33 +359,95 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
 
       <section className="panel" style={{ marginTop: 16 }}>
         <h2>単価マスタ検索</h2>
-        <div className="toolbar">
-          <select
-            className="select"
-            style={{ maxWidth: 260 }}
-            value={selectedCategory}
-            onChange={(event) => setSelectedCategory(event.target.value as WorkCategoryKey)}
-          >
-            {data.workCategories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-          <input
-            className="input"
-            style={{ maxWidth: 420 }}
-            placeholder="名称、仕様、備考、施工で検索"
-            value={priceQuery}
-            onChange={(event) => setPriceQuery(event.target.value)}
-          />
+        <div className="grid cols-3">
+          <div className="field">
+            <label>工種</label>
+            <select
+              className="select"
+              value={selectedCategory}
+              onChange={(event) => setSelectedCategory(event.target.value as WorkCategoryKey)}
+            >
+              {data.workCategories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>名称</label>
+            <select
+              className="select"
+              value={priceNameFilter}
+              onChange={(event) => {
+                setPriceNameFilter(event.target.value);
+                setPriceSpecificationFilter("");
+                setPriceConstructionFilter("");
+              }}
+            >
+              <option value="">すべて</option>
+              {priceNameOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>摘要</label>
+            <select
+              className="select"
+              value={priceSpecificationFilter}
+              onChange={(event) => {
+                setPriceSpecificationFilter(event.target.value);
+                setPriceConstructionFilter("");
+              }}
+            >
+              <option value="">すべて</option>
+              {priceSpecificationOptions.map((specification) => (
+                <option key={specification} value={specification}>
+                  {specification}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>施工</label>
+            <select className="select" value={priceConstructionFilter} onChange={(event) => setPriceConstructionFilter(event.target.value)}>
+              <option value="">すべて</option>
+              {priceConstructionOptions.map((construction) => (
+                <option key={construction} value={construction}>
+                  {construction}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label>キーワード</label>
+            <input
+              className="input"
+              placeholder="備考などを補助検索"
+              value={priceKeyword}
+              onChange={(event) => setPriceKeyword(event.target.value)}
+            />
+          </div>
+          <div className="field">
+            <label>操作</label>
+            <button className="button secondary" type="button" onClick={resetPriceFilters}>
+              条件クリア
+            </button>
+          </div>
         </div>
+        <p className="muted">
+          候補 {filteredPriceItemCount.toLocaleString()}件中、最大{filteredPriceItems.length.toLocaleString()}件を表示しています。
+        </p>
         <div className="table-wrap" style={{ marginTop: 12 }}>
           <table>
             <thead>
               <tr>
                 <th>名称</th>
-                <th>仕様</th>
+                <th>摘要</th>
+                <th>備考</th>
                 <th>施工</th>
                 <th>単位</th>
                 <th>材料費</th>
@@ -349,6 +461,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                 <tr key={item.id}>
                   <td>{item.name}</td>
                   <td>{item.specification}</td>
+                  <td>{item.note}</td>
                   <td>{item.construction}</td>
                   <td>{item.unit}</td>
                   <td className="numeric">{item.materialCost.toLocaleString()}</td>
