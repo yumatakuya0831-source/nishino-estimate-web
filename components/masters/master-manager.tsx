@@ -232,13 +232,14 @@ export function MasterManager() {
   };
 
   const persistProfile = async (profile: Profile) => {
-    if (!supabase || disabled) return;
+    if (!supabase || disabled) return false;
     const { error } = await supabase.from("profiles").upsert({
       id: profile.id,
       name: profile.name,
       role: profile.role,
     });
     showResult("ユーザーマスタ", error);
+    return !error;
   };
 
   const updateCustomer = (id: string, patch: Partial<Customer>) => {
@@ -690,9 +691,11 @@ export function MasterManager() {
                               className="button"
                               disabled={disabled}
                               type="button"
-                              onClick={() => {
-                                void persistProfile(profile);
-                                setEditingProfileId(null);
+                              onClick={async () => {
+                                const saved = await persistProfile(profile);
+                                if (saved) {
+                                  setEditingProfileId(null);
+                                }
                               }}
                             >
                               保存

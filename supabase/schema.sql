@@ -146,6 +146,7 @@ language sql
 stable
 security definer
 set search_path = public
+set row_security = off
 as $$
   select exists (
     select 1
@@ -157,8 +158,11 @@ $$;
 
 grant execute on function is_admin() to authenticated;
 
-create policy "profiles can read own profile" on profiles for select using (id = auth.uid() or is_admin());
-create policy "admins manage profiles" on profiles for all using (is_admin()) with check (is_admin());
+create policy "profiles can read own profile" on profiles for select to authenticated using (id = auth.uid());
+create policy "admins can read profiles" on profiles for select to authenticated using (public.is_admin());
+create policy "admins can insert profiles" on profiles for insert to authenticated with check (public.is_admin());
+create policy "admins can update profiles" on profiles for update to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "admins can delete profiles" on profiles for delete to authenticated using (public.is_admin());
 
 create policy "authenticated read customers" on customers for select to authenticated using (true);
 create policy "admins manage customers" on customers for all to authenticated using (is_admin()) with check (is_admin());
