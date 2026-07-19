@@ -56,6 +56,7 @@ export function MasterManager() {
   const [pricePageItems, setPricePageItems] = useState<PriceItem[]>([]);
   const [priceTotalCount, setPriceTotalCount] = useState(0);
   const [pricePageLoading, setPricePageLoading] = useState(false);
+  const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   const disabled = !isAdmin;
@@ -298,6 +299,7 @@ export function MasterManager() {
       ...current,
       profiles: current.profiles.filter((item) => item.id !== profile.id),
     }));
+    setEditingProfileId(null);
     setMessage("ユーザーマスタから削除しました。");
   };
 
@@ -649,47 +651,70 @@ export function MasterManager() {
                 </tr>
               </thead>
               <tbody>
-                {data.profiles.map((profile) => (
-                  <tr key={profile.id}>
-                    <td>
-                      <input
-                        className="input"
-                        disabled={disabled}
-                        value={profile.name}
-                        onBlur={() => void persistProfile(profile)}
-                        onChange={(event) => updateProfile(profile.id, { name: event.target.value })}
-                      />
-                    </td>
-                    <td>{profile.email || <span className="muted">Auth側で管理</span>}</td>
-                    <td>
-                      <select
-                        className="select"
-                        disabled={disabled}
-                        value={profile.role}
-                        onBlur={() => void persistProfile(profile)}
-                        onChange={(event) => {
-                          const nextRole = event.target.value as UserRole;
-                          const next = { ...profile, role: nextRole };
-                          updateProfile(profile.id, { role: nextRole });
-                          void persistProfile(next);
-                        }}
-                      >
-                        <option value="admin">管理者</option>
-                        <option value="user">一般</option>
-                      </select>
-                    </td>
-                    <td>
-                      <button
-                        className="button danger"
-                        disabled={disabled || profile.id === session?.user.id}
-                        type="button"
-                        onClick={() => void deleteProfile(profile)}
-                      >
-                        削除
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {data.profiles.map((profile) => {
+                  const isEditing = editingProfileId === profile.id;
+                  return (
+                    <tr key={profile.id}>
+                      <td>
+                        {isEditing ? (
+                          <input
+                            className="input"
+                            disabled={disabled}
+                            value={profile.name}
+                            onChange={(event) => updateProfile(profile.id, { name: event.target.value })}
+                          />
+                        ) : (
+                          profile.name
+                        )}
+                      </td>
+                      <td>{profile.email || <span className="muted">Auth側で管理</span>}</td>
+                      <td>
+                        {isEditing ? (
+                          <select
+                            className="select"
+                            disabled={disabled}
+                            value={profile.role}
+                            onChange={(event) => updateProfile(profile.id, { role: event.target.value as UserRole })}
+                          >
+                            <option value="admin">管理者</option>
+                            <option value="user">一般</option>
+                          </select>
+                        ) : (
+                          <span className="badge">{profile.role === "admin" ? "管理者" : "一般"}</span>
+                        )}
+                      </td>
+                      <td>
+                        {isEditing ? (
+                          <div className="toolbar">
+                            <button
+                              className="button"
+                              disabled={disabled}
+                              type="button"
+                              onClick={() => {
+                                void persistProfile(profile);
+                                setEditingProfileId(null);
+                              }}
+                            >
+                              保存
+                            </button>
+                            <button
+                              className="button danger"
+                              disabled={disabled || profile.id === session?.user.id}
+                              type="button"
+                              onClick={() => void deleteProfile(profile)}
+                            >
+                              削除
+                            </button>
+                          </div>
+                        ) : (
+                          <button className="button secondary" disabled={disabled} type="button" onClick={() => setEditingProfileId(profile.id)}>
+                            編集
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
