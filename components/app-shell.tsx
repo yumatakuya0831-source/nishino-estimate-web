@@ -7,6 +7,7 @@ const navItems = [
   { href: "/", label: "ホーム", adminOnly: false },
   { href: "/estimates", label: "見積一覧", adminOnly: false },
   { href: "/estimates/new", label: "新規見積", adminOnly: false },
+  { href: "/account", label: "アカウント設定", adminOnly: false },
   { href: "/masters", label: "マスタ管理", adminOnly: true },
   { href: "/price-imports", label: "単価取込", adminOnly: true },
 ];
