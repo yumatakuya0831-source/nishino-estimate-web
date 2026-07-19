@@ -3,9 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 const createUserSchema = z.object({
+  action: z.enum(["invite", "resend"]).default("invite"),
   email: z.string().email(),
-  name: z.string().min(1),
-  role: z.enum(["admin", "user"]),
+  name: z.string().min(1).optional(),
+  role: z.enum(["admin", "user"]).optional(),
 });
 
 async function findUserByEmail(admin: ReturnType<typeof getSupabaseAdmin>, email: string) {
@@ -101,10 +102,38 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "入力内容を確認してください。" }, { status: 400 });
   }
 
-  const { email, name, role } = parsed.data;
+  const { action, email } = parsed.data;
+  const name = parsed.data.name || email.split("@")[0];
+  const role = parsed.data.role || "user";
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "").replace(/\/$/, "");
   const inviteRedirectTo = appUrl ? `${appUrl}/?auth_action=invite` : undefined;
   const recoveryRedirectTo = appUrl ? `${appUrl}/?auth_action=recovery` : undefined;
+
+  if (action === "resend") {
+    const existingUser = await findUserByEmail(admin, email);
+    if (!existingUser) {
+      return NextResponse.json({ error: "対象ユーザーがSupabase Authに見つかりません。" }, { status: 404 });
+    }
+
+    const { error: resetError } = await userClient.auth.resetPasswordForEmail(email, {
+      redirectTo: recoveryRedirectTo,
+    });
+
+    if (resetError) {
+      return NextResponse.json({ error: resetError.message }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      mode: "password_reset",
+      profile: {
+        id: existingUser.id,
+        email,
+        name: existingUser.user_metadata?.name || name,
+        role,
+      },
+    });
+  }
+
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { name },
     redirectTo: inviteRedirectTo,

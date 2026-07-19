@@ -61,6 +61,7 @@ export function MasterManager() {
   const [newProfileEmail, setNewProfileEmail] = useState("");
   const [newProfileRole, setNewProfileRole] = useState<UserRole>("user");
   const [invitingProfile, setInvitingProfile] = useState(false);
+  const [resendingProfileId, setResendingProfileId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
 
   const disabled = !isAdmin;
@@ -259,6 +260,7 @@ export function MasterManager() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
+        action: "invite",
         email: newProfileEmail,
         name: newProfileName,
         role: newProfileRole,
@@ -288,6 +290,35 @@ export function MasterManager() {
         ? "既存ユーザーをユーザーマスタに登録し、パスワード再設定メールを送信しました。"
         : "ユーザーを招待しました。招待メールからパスワードを設定してもらってください。",
     );
+  };
+
+  const resendProfilePasswordSetup = async (profile: Profile) => {
+    if (!session || disabled || resendingProfileId || !profile.email) return;
+
+    setResendingProfileId(profile.id);
+    setMessage("");
+
+    const response = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action: "resend",
+        email: profile.email,
+      }),
+    });
+    const result = (await response.json()) as { error?: string };
+
+    if (!response.ok) {
+      setMessage(`パスワード設定メールの再送に失敗しました: ${result.error || "時間を置いて再度お試しください。"}`);
+      setResendingProfileId(null);
+      return;
+    }
+
+    setResendingProfileId(null);
+    setMessage("パスワード設定メールを再送しました。");
   };
 
   const updateCustomer = (id: string, patch: Partial<Customer>) => {
@@ -805,9 +836,19 @@ export function MasterManager() {
                             </button>
                           </div>
                         ) : (
-                          <button className="button secondary" disabled={disabled} type="button" onClick={() => setEditingProfileId(profile.id)}>
-                            編集
-                          </button>
+                          <div className="toolbar">
+                            <button className="button secondary" disabled={disabled} type="button" onClick={() => setEditingProfileId(profile.id)}>
+                              編集
+                            </button>
+                            <button
+                              className="button secondary"
+                              disabled={disabled || !profile.email || resendingProfileId === profile.id}
+                              type="button"
+                              onClick={() => void resendProfilePasswordSetup(profile)}
+                            >
+                              {resendingProfileId === profile.id ? "再送中..." : "再送"}
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
