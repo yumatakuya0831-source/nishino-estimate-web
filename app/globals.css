@@ -302,81 +302,191 @@ th {
   background: #ffffff;
   color: #111827;
   margin: 0 auto;
-  max-width: 980px;
+  max-width: 1122px;
 }
 
 .paper-title {
-  font-size: 28px;
-  letter-spacing: 0.08em;
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: 0.45em;
+  margin: 6mm 0 8mm;
   text-align: center;
-  text-decoration: underline;
 }
 
 .print-page {
   background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  font-family: "Yu Gothic", "Meiryo", sans-serif;
+  font-size: 11px;
   margin: 0 auto 18px;
   min-height: 297mm;
-  padding: 14mm;
+  padding: 12mm 14mm 10mm;
   page-break-after: always;
+  position: relative;
   width: 210mm;
+}
+
+.landscape-page {
+  min-height: 210mm;
+  padding: 10mm 14mm 8mm;
+  width: 297mm;
 }
 
 .print-page:last-child {
   page-break-after: auto;
 }
 
-.paper-meta {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 18px;
+.paper-date {
+  text-align: right;
 }
 
-.paper-grid {
+.cover-grid {
   display: grid;
-  grid-template-columns: 1fr 330px;
-  gap: 24px;
-  margin-top: 18px;
+  grid-template-columns: 1fr 255px;
+  gap: 22px;
+  margin-top: 8mm;
 }
 
 .customer-name {
   border-bottom: 1px solid #111827;
-  font-size: 22px;
-  font-weight: 700;
-  margin: 28px 0 18px;
-  padding-bottom: 8px;
+  font-size: 20px;
+  margin: 0 0 8mm;
+  min-height: 9mm;
+  padding-bottom: 2mm;
 }
 
 .company-block {
-  line-height: 1.7;
+  line-height: 1.65;
+}
+
+.company-block strong {
+  display: block;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  margin-bottom: 4mm;
+  text-align: center;
+}
+
+.cover-greeting {
+  line-height: 1.8;
+  margin: 0 0 11mm;
+}
+
+.estimate-total-line {
+  align-items: baseline;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 48px 1fr;
+  margin-top: 8mm;
+}
+
+.estimate-total-line strong {
+  border-bottom: 2px solid #111827;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  padding: 0 0 2mm;
 }
 
 .paper-table th,
 .paper-table td {
   border: 1px solid #111827;
-  padding: 6px 8px;
+  height: 7.5mm;
+  padding: 1mm 1.5mm;
+  vertical-align: middle;
 }
 
 .paper-table th {
-  background: #f3f4f6;
+  background: #ffffff;
+  font-weight: 500;
 }
 
-.summary-table th {
-  width: 120px;
+.cover-info-table {
+  margin: 8mm 0 6mm;
+  width: 100%;
 }
 
-.grand-total {
-  font-size: 22px;
-  font-weight: 800;
+.cover-info-table th {
+  width: 22mm;
 }
 
-.paper-section {
-  break-inside: avoid;
-  margin-top: 24px;
+.cover-info-table td {
+  width: auto;
 }
 
-.detail-title {
-  border-bottom: 2px solid #111827;
-  padding-bottom: 6px;
+.paper-subtitle {
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: 0.45em;
+  margin: 6mm 0 4mm;
+  text-align: center;
+}
+
+.estimate-lines-table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.estimate-lines-table .col-no {
+  width: 9mm;
+}
+
+.estimate-lines-table .col-name {
+  width: 56mm;
+}
+
+.estimate-lines-table .col-spec {
+  width: 48mm;
+}
+
+.estimate-lines-table .col-qty {
+  width: 16mm;
+}
+
+.estimate-lines-table .col-unit {
+  width: 14mm;
+}
+
+.estimate-lines-table .col-price,
+.estimate-lines-table .col-amount {
+  width: 25mm;
+}
+
+.estimate-lines-table .col-memo {
+  width: auto;
+}
+
+.cover-lines-table td,
+.cover-lines-table th,
+.summary-lines-table td,
+.summary-lines-table th {
+  height: 7mm;
+}
+
+.detail-lines-table td,
+.detail-lines-table th {
+  height: 7.2mm;
+}
+
+.blank-row td {
+  color: transparent;
+}
+
+.category-row td {
+  font-weight: 600;
+}
+
+.numeric {
+  text-align: right;
+}
+
+.paper-page-number {
+  bottom: 5mm;
+  position: absolute;
+  right: 14mm;
+}
+
+.estimate-paper table {
+  min-width: 0;
 }
 
 @media (max-width: 900px) {
@@ -435,8 +545,7 @@ th {
     font-size: 21px;
   }
 
-  .paper-meta,
-  .paper-grid {
+  .cover-grid {
     display: block;
   }
 
@@ -503,6 +612,16 @@ th {
 }
 
 @media print {
+  @page {
+    margin: 0;
+    size: A4 portrait;
+  }
+
+  @page landscape {
+    margin: 0;
+    size: A4 landscape;
+  }
+
   body {
     background: #ffffff;
   }
@@ -520,6 +639,15 @@ th {
     padding: 0;
   }
 
+  .print-page {
+    box-shadow: none;
+    margin: 0;
+  }
+
+  .landscape-page {
+    page: landscape;
+  }
+
   .panel {
     border: 0;
     padding: 0;
@@ -531,9 +659,15 @@ th {
 
   .print-page {
     margin: 0;
-    min-height: auto;
-    padding: 10mm;
-    width: auto;
+    min-height: 297mm;
+    padding: 12mm 14mm 10mm;
+    width: 210mm;
+  }
+
+  .landscape-page {
+    min-height: 210mm;
+    padding: 10mm 14mm 8mm;
+    width: 297mm;
   }
 
   .paper-table {
