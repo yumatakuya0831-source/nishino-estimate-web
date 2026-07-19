@@ -33,6 +33,12 @@ function getAuthActionFromUrl() {
   return searchAction || hashAction || "";
 }
 
+function getAuthRedirectUrl(action: "invite" | "recovery") {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || (typeof window !== "undefined" ? window.location.origin : "");
+
+  return appUrl ? `${appUrl.replace(/\/$/, "")}/?auth_action=${action}` : undefined;
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [data, setDataState] = useState<AppData>(() => loadData());
   const [session, setSession] = useState<Session | null>(null);
@@ -439,7 +445,7 @@ function AuthGate() {
     setResetMessage("");
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/?auth_action=recovery`,
+      redirectTo: getAuthRedirectUrl("recovery"),
     });
 
     setResetMessage(

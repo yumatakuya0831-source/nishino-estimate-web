@@ -102,9 +102,9 @@ export async function POST(request: Request) {
   }
 
   const { email, name, role } = parsed.data;
-  const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || undefined;
-  const inviteRedirectTo = origin ? `${origin}/?auth_action=invite` : undefined;
-  const recoveryRedirectTo = origin ? `${origin}/?auth_action=recovery` : undefined;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "").replace(/\/$/, "");
+  const inviteRedirectTo = appUrl ? `${appUrl}/?auth_action=invite` : undefined;
+  const recoveryRedirectTo = appUrl ? `${appUrl}/?auth_action=recovery` : undefined;
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { name },
     redirectTo: inviteRedirectTo,
