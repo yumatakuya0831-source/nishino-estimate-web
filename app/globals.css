@@ -359,12 +359,54 @@ th {
   line-height: 1.65;
 }
 
+.company-name-stamp-wrap {
+  margin-bottom: 4mm;
+  min-height: 18mm;
+  position: relative;
+}
+
 .company-block strong {
   display: block;
   font-size: 15px;
   letter-spacing: 0.12em;
-  margin-bottom: 4mm;
+  padding-top: 4mm;
+  position: relative;
   text-align: center;
+  z-index: 1;
+}
+
+.digital-company-stamp {
+  align-items: center;
+  border: 2px solid rgba(196, 24, 24, 0.72);
+  border-radius: 999px;
+  color: rgba(196, 24, 24, 0.72);
+  display: grid;
+  font-family: "Yu Mincho", "Yu Gothic", serif;
+  font-size: 9px;
+  font-weight: 700;
+  height: 18mm;
+  justify-items: center;
+  letter-spacing: 0;
+  line-height: 1;
+  padding: 2mm 0;
+  position: absolute;
+  right: 9mm;
+  top: 0;
+  width: 18mm;
+  z-index: 2;
+}
+
+.digital-company-stamp::before {
+  border: 1px solid rgba(196, 24, 24, 0.48);
+  border-radius: 999px;
+  content: "";
+  inset: 1.2mm;
+  position: absolute;
+}
+
+.digital-company-stamp span {
+  position: relative;
+  z-index: 1;
 }
 
 .cover-greeting {

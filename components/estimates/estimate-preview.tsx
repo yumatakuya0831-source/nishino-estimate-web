@@ -333,7 +333,14 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
               </div>
             </div>
             <div className="company-block">
-              <strong>{data.companySettings.companyName}</strong>
+              <div className="company-name-stamp-wrap">
+                <strong>{data.companySettings.companyName}</strong>
+                <span aria-hidden="true" className="digital-company-stamp">
+                  <span>ニシノ</span>
+                  <span>設備</span>
+                  <span>工業</span>
+                </span>
+              </div>
               <p>
                 〒{data.companySettings.postalCode}
                 <br />
