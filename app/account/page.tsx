@@ -12,6 +12,7 @@ export default function AccountPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [passwordsVisible, setPasswordsVisible] = useState(false);
 
   const updatePassword = async () => {
     if (!supabase || !session?.user.email) {
@@ -94,12 +95,15 @@ export default function AccountPage() {
         <section className="panel">
           <h2>パスワード変更</h2>
           <div className="auth-form">
+            <button className="button secondary" type="button" onClick={() => setPasswordsVisible((current) => !current)}>
+              {passwordsVisible ? "パスワードを非表示" : "パスワードを表示"}
+            </button>
             <div className="field">
               <label>現在のパスワード</label>
               <input
                 className="input"
                 autoComplete="current-password"
-                type="password"
+                type={passwordsVisible ? "text" : "password"}
                 value={currentPassword}
                 onChange={(event) => setCurrentPassword(event.target.value)}
               />
@@ -109,7 +113,7 @@ export default function AccountPage() {
               <input
                 className="input"
                 autoComplete="new-password"
-                type="password"
+                type={passwordsVisible ? "text" : "password"}
                 value={newPassword}
                 onChange={(event) => setNewPassword(event.target.value)}
               />
@@ -119,7 +123,7 @@ export default function AccountPage() {
               <input
                 className="input"
                 autoComplete="new-password"
-                type="password"
+                type={passwordsVisible ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(event) => setConfirmPassword(event.target.value)}
               />

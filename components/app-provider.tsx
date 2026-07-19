@@ -413,6 +413,7 @@ function AuthGate() {
   const [resetMessage, setResetMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -477,12 +478,15 @@ function AuthGate() {
           <input
             className="input"
             autoComplete="current-password"
-            type="password"
+            type={passwordVisible ? "text" : "password"}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             required
           />
         </div>
+        <button className="button secondary" type="button" onClick={() => setPasswordVisible((current) => !current)}>
+          {passwordVisible ? "パスワードを非表示" : "パスワードを表示"}
+        </button>
         {message && <p className="error-text">{message}</p>}
         <button className="button" disabled={submitting} type="submit">
           {submitting ? "ログイン中..." : "ログイン"}
@@ -501,6 +505,7 @@ function PasswordRecoveryGate({ onComplete }: { onComplete: () => void }) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [passwordsVisible, setPasswordsVisible] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -537,12 +542,15 @@ function PasswordRecoveryGate({ onComplete }: { onComplete: () => void }) {
       <h1>パスワード再設定</h1>
       <p className="muted">新しいパスワードを入力してください。</p>
       <form className="auth-form" onSubmit={handleSubmit}>
+        <button className="button secondary" type="button" onClick={() => setPasswordsVisible((current) => !current)}>
+          {passwordsVisible ? "パスワードを非表示" : "パスワードを表示"}
+        </button>
         <div className="field">
           <label>新しいパスワード</label>
           <input
             className="input"
             autoComplete="new-password"
-            type="password"
+            type={passwordsVisible ? "text" : "password"}
             value={password}
             onChange={(event) => setPassword(event.target.value)}
             required
@@ -553,7 +561,7 @@ function PasswordRecoveryGate({ onComplete }: { onComplete: () => void }) {
           <input
             className="input"
             autoComplete="new-password"
-            type="password"
+            type={passwordsVisible ? "text" : "password"}
             value={confirmPassword}
             onChange={(event) => setConfirmPassword(event.target.value)}
             required
