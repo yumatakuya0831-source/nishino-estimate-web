@@ -372,13 +372,12 @@ th {
   padding-top: 4mm;
   position: relative;
   text-align: center;
-  z-index: 1;
+  z-index: 3;
 }
 
 .digital-company-stamp {
   height: 18mm;
   object-fit: contain;
-  opacity: 0.82;
   position: absolute;
   right: 9mm;
   top: 0;
