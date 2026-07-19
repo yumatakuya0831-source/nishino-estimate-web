@@ -1,11 +1,48 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppData } from "@/components/app-provider";
 import { supabase } from "@/lib/supabase/client";
 import type { CompanySettings, Customer, PriceItem, WorkCategory } from "@/types/domain";
 
 type MasterTab = "customers" | "prices" | "categories" | "company" | "users";
+type PriceActiveFilter = "all" | "active" | "inactive";
+
+const PRICE_PAGE_SIZE = 50;
+
+function toPriceItem(row: {
+  id: string;
+  year: number;
+  page_no: number;
+  name: string;
+  specification: string;
+  note: string;
+  construction: string;
+  unit: string;
+  material_unit_price: number;
+  material_cost: number;
+  labor_cost: number;
+  expense: number;
+  composite_unit_price: number;
+  active: boolean;
+}): PriceItem {
+  return {
+    id: row.id,
+    year: row.year,
+    pageNo: row.page_no,
+    name: row.name,
+    specification: row.specification,
+    note: row.note,
+    construction: row.construction,
+    unit: row.unit,
+    materialUnitPrice: Number(row.material_unit_price),
+    materialCost: Number(row.material_cost),
+    laborCost: Number(row.labor_cost),
+    expense: Number(row.expense),
+    compositeUnitPrice: Number(row.composite_unit_price),
+    active: row.active,
+  };
+}
 
 export function MasterManager() {
   const { data, setData, isAdmin, dataLoading, dataLoadingLabel } = useAppData();
@@ -14,7 +51,11 @@ export function MasterManager() {
   const [tabLoadingLabel, setTabLoadingLabel] = useState("");
   const [priceSearch, setPriceSearch] = useState("");
   const [priceYearFilter, setPriceYearFilter] = useState("all");
-  const [priceActiveFilter, setPriceActiveFilter] = useState<"all" | "active" | "inactive">("active");
+  const [priceActiveFilter, setPriceActiveFilter] = useState<PriceActiveFilter>("active");
+  const [pricePage, setPricePage] = useState(1);
+  const [pricePageItems, setPricePageItems] = useState<PriceItem[]>([]);
+  const [priceTotalCount, setPriceTotalCount] = useState(0);
+  const [pricePageLoading, setPricePageLoading] = useState(false);
   const [message, setMessage] = useState("");
 
   const disabled = !isAdmin;
@@ -22,7 +63,7 @@ export function MasterManager() {
     () => Array.from(new Set(data.priceItems.map((item) => item.year))).sort((a, b) => b - a),
     [data.priceItems],
   );
-  const filteredPriceItems = useMemo(() => {
+  const localFilteredPriceItems = useMemo(() => {
     const keyword = priceSearch.trim().toLocaleLowerCase("ja-JP");
 
     return data.priceItems.filter((item) => {
@@ -39,6 +80,79 @@ export function MasterManager() {
       return matchesYear && matchesActive && matchesKeyword;
     });
   }, [data.priceItems, priceActiveFilter, priceSearch, priceYearFilter]);
+  const localPricePageItems = useMemo(() => {
+    const start = (pricePage - 1) * PRICE_PAGE_SIZE;
+    return localFilteredPriceItems.slice(start, start + PRICE_PAGE_SIZE);
+  }, [localFilteredPriceItems, pricePage]);
+  const displayedPriceItems = supabase ? pricePageItems : localPricePageItems;
+  const displayedPriceCount = supabase ? priceTotalCount : localFilteredPriceItems.length;
+  const pricePageCount = Math.max(1, Math.ceil(displayedPriceCount / PRICE_PAGE_SIZE));
+
+  useEffect(() => {
+    setPricePage(1);
+  }, [priceActiveFilter, priceSearch, priceYearFilter]);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client || tab !== "prices") {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadPricePage = async () => {
+      const keyword = priceSearch.trim().replace(/[%_,()]/g, " ");
+      const from = (pricePage - 1) * PRICE_PAGE_SIZE;
+      const to = from + PRICE_PAGE_SIZE - 1;
+
+      setPricePageLoading(true);
+      let query = client
+        .from("price_items")
+        .select(
+          "id, year, page_no, name, specification, note, construction, unit, material_unit_price, material_cost, labor_cost, expense, composite_unit_price, active",
+          { count: "exact" },
+        )
+        .order("year", { ascending: false })
+        .order("page_no", { ascending: true })
+        .range(from, to);
+
+      if (priceYearFilter !== "all") {
+        query = query.eq("year", Number(priceYearFilter));
+      }
+      if (priceActiveFilter !== "all") {
+        query = query.eq("active", priceActiveFilter === "active");
+      }
+      if (keyword) {
+        query = query.or(
+          `name.ilike.%${keyword}%,specification.ilike.%${keyword}%,note.ilike.%${keyword}%,construction.ilike.%${keyword}%,unit.ilike.%${keyword}%`,
+        );
+      }
+
+      const { data: rows, count, error } = await query;
+
+      if (cancelled) {
+        return;
+      }
+
+      if (error) {
+        setMessage(`単価マスタの取得に失敗しました: ${error.message}`);
+        setPricePageItems([]);
+        setPriceTotalCount(0);
+        setPricePageLoading(false);
+        return;
+      }
+
+      setPricePageItems((rows || []).map(toPriceItem));
+      setPriceTotalCount(count || 0);
+      setPricePageLoading(false);
+    };
+
+    void loadPricePage();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [priceActiveFilter, pricePage, priceSearch, priceYearFilter, tab]);
 
   if (!isAdmin) {
     return (
@@ -128,6 +242,7 @@ export function MasterManager() {
       ...current,
       priceItems: current.priceItems.map((item) => (item.id === id ? { ...item, ...patch } : item)),
     }));
+    setPricePageItems((current) => current.map((item) => (item.id === id ? { ...item, ...patch } : item)));
   };
 
   const updateCategory = (id: WorkCategory["id"], patch: Partial<WorkCategory>) => {
@@ -176,6 +291,8 @@ export function MasterManager() {
       active: true,
     };
     setData((current) => ({ ...current, priceItems: [...current.priceItems, item] }));
+    setPricePageItems((current) => [item, ...current].slice(0, PRICE_PAGE_SIZE));
+    setPriceTotalCount((current) => current + 1);
     void persistPrice(item);
   };
 
@@ -324,7 +441,7 @@ export function MasterManager() {
               <select
                 className="select"
                 value={priceActiveFilter}
-                onChange={(event) => setPriceActiveFilter(event.target.value as "all" | "active" | "inactive")}
+                onChange={(event) => setPriceActiveFilter(event.target.value as PriceActiveFilter)}
               >
                 <option value="active">有効のみ</option>
                 <option value="inactive">無効のみ</option>
@@ -332,9 +449,42 @@ export function MasterManager() {
               </select>
             </div>
           </div>
-          <p className="muted">
-            {filteredPriceItems.length.toLocaleString()}件 / 全{data.priceItems.length.toLocaleString()}件
-          </p>
+          {pricePageLoading && (
+            <div className="loading-box" role="status" aria-live="polite" style={{ marginBottom: 12 }}>
+              <span className="loading-spinner" aria-hidden="true" />
+              <div>
+                <strong>単価マスタを取得しています</strong>
+                <p className="muted">現在の条件に一致する単価をページ単位で読み込んでいます。</p>
+              </div>
+            </div>
+          )}
+          <div className="toolbar" style={{ justifyContent: "space-between", marginBottom: 12 }}>
+            <p className="muted" style={{ margin: 0 }}>
+              {displayedPriceCount.toLocaleString()}件中 {(displayedPriceCount === 0 ? 0 : (pricePage - 1) * PRICE_PAGE_SIZE + 1).toLocaleString()}
+              -{Math.min(pricePage * PRICE_PAGE_SIZE, displayedPriceCount).toLocaleString()}件を表示
+            </p>
+            <div className="toolbar">
+              <button
+                className="button secondary"
+                disabled={pricePageLoading || pricePage <= 1}
+                type="button"
+                onClick={() => setPricePage((current) => Math.max(1, current - 1))}
+              >
+                前へ
+              </button>
+              <span className="muted">
+                {pricePage} / {pricePageCount}ページ
+              </span>
+              <button
+                className="button secondary"
+                disabled={pricePageLoading || pricePage >= pricePageCount}
+                type="button"
+                onClick={() => setPricePage((current) => Math.min(pricePageCount, current + 1))}
+              >
+                次へ
+              </button>
+            </div>
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
@@ -355,7 +505,7 @@ export function MasterManager() {
                 </tr>
               </thead>
               <tbody>
-                {filteredPriceItems.map((item) => (
+                {displayedPriceItems.map((item) => (
                   <tr key={item.id}>
                     <td><input className="input" disabled={disabled} type="number" value={item.year} onBlur={() => void persistPrice(item)} onChange={(event) => updatePrice(item.id, { year: Number(event.target.value) })} /></td>
                     <td><input className="input" disabled={disabled} type="number" value={item.pageNo} onBlur={() => void persistPrice(item)} onChange={(event) => updatePrice(item.id, { pageNo: Number(event.target.value) })} /></td>
