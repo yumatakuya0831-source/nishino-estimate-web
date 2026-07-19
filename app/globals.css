@@ -20,6 +20,7 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: Arial, "Yu Gothic", "Meiryo", sans-serif;
+  overflow-x: hidden;
 }
 
 a {
@@ -71,6 +72,7 @@ textarea {
 
 .content {
   padding: 28px;
+  min-width: 0;
 }
 
 .page-header {
@@ -135,6 +137,7 @@ textarea {
   justify-content: center;
   min-height: 38px;
   padding: 8px 12px;
+  text-align: center;
 }
 
 .button.secondary {
@@ -179,11 +182,15 @@ textarea {
 }
 
 .table-wrap {
+  border: 1px solid var(--line);
+  border-radius: 8px;
   overflow: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 table {
   border-collapse: collapse;
+  min-width: 760px;
   width: 100%;
 }
 
@@ -193,6 +200,7 @@ td {
   padding: 9px 8px;
   text-align: left;
   vertical-align: top;
+  word-break: break-word;
 }
 
 th {
@@ -376,9 +384,121 @@ th {
     grid-template-columns: 1fr;
   }
 
+  .sidebar {
+    padding: 14px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+  }
+
+  .brand {
+    font-size: 15px;
+    margin-bottom: 12px;
+  }
+
+  .nav {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav a {
+    flex: 0 0 auto;
+  }
+
+  .content {
+    padding: 18px;
+  }
+
+  .page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
   .grid.cols-2,
   .grid.cols-3 {
     grid-template-columns: 1fr;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .summary-number {
+    font-size: 21px;
+  }
+
+  .paper-meta,
+  .paper-grid {
+    display: block;
+  }
+
+  .estimate-paper {
+    max-width: 100%;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 640px) {
+  .content {
+    padding: 12px;
+  }
+
+  .page-title {
+    font-size: 22px;
+  }
+
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .toolbar > .button,
+  .toolbar > a.button,
+  .toolbar > button.button {
+    flex: 1 1 150px;
+  }
+
+  .button,
+  .input,
+  .select {
+    min-height: 42px;
+  }
+
+  .auth-card {
+    margin: 24px 12px 0;
+    padding: 18px;
+  }
+
+  .table-wrap {
+    margin-left: -4px;
+    margin-right: -4px;
+  }
+
+  table {
+    min-width: 920px;
+  }
+
+  th,
+  td {
+    padding: 8px 7px;
+  }
+
+  td .input,
+  td .select {
+    min-width: 120px;
+  }
+
+  .loading-box {
+    align-items: flex-start;
   }
 }
 
@@ -418,5 +538,14 @@ th {
 
   .paper-table {
     font-size: 11px;
+  }
+
+  .table-wrap {
+    border: 0;
+    overflow: visible;
+  }
+
+  table {
+    min-width: 0;
   }
 }
