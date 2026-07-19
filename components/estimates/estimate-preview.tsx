@@ -485,11 +485,11 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
                     <th className="col-no" />
                     <th className="col-name">名 称</th>
                     <th className="col-spec">仕 様</th>
-                    <th>数量</th>
-                    <th>単位</th>
-                    <th>単 価</th>
-                    <th>金 額</th>
-                    <th>備 考</th>
+                    <th className="col-qty">数量</th>
+                    <th className="col-unit">単位</th>
+                    <th className="col-price">単 価</th>
+                    <th className="col-amount">金 額</th>
+                    <th className="col-memo">備 考</th>
                   </tr>
                 </thead>
                 <tbody>

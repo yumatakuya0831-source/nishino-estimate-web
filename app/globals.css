@@ -391,8 +391,11 @@ th {
 .paper-table td {
   border: 1px solid #111827;
   height: 7.5mm;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
   padding: 1mm 1.5mm;
   vertical-align: middle;
+  word-break: break-word;
 }
 
 .paper-table th {
@@ -453,6 +456,31 @@ th {
 
 .estimate-lines-table .col-memo {
   width: auto;
+}
+
+.cover-page .estimate-lines-table .col-no {
+  width: 7mm;
+}
+
+.cover-page .estimate-lines-table .col-name {
+  width: 43mm;
+}
+
+.cover-page .estimate-lines-table .col-spec {
+  width: 31mm;
+}
+
+.cover-page .estimate-lines-table .col-qty {
+  width: 12mm;
+}
+
+.cover-page .estimate-lines-table .col-unit {
+  width: 11mm;
+}
+
+.cover-page .estimate-lines-table .col-price,
+.cover-page .estimate-lines-table .col-amount {
+  width: 21mm;
 }
 
 .cover-lines-table td,
@@ -594,6 +622,10 @@ th {
 
   table {
     min-width: 920px;
+  }
+
+  .estimate-paper table {
+    min-width: 0;
   }
 
   th,
