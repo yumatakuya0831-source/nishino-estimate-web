@@ -132,10 +132,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             .from("company_settings")
             .select("id, company_name, postal_code, address, tel, fax, default_expense_rate, estimate_number_pattern")
             .limit(1),
-        ]);
+      ]);
 
       if (profilesError) {
-        console.error("Failed to load profiles from Supabase", profilesError);
+        console.warn("Failed to load profiles from Supabase", profilesError);
       }
       if (customersError) {
         console.error("Failed to load customers from Supabase", customersError);

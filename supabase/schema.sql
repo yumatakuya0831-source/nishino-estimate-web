@@ -144,6 +144,8 @@ create or replace function is_admin()
 returns boolean
 language sql
 stable
+security definer
+set search_path = public
 as $$
   select exists (
     select 1
@@ -152,6 +154,8 @@ as $$
       and role = 'admin'
   );
 $$;
+
+grant execute on function is_admin() to authenticated;
 
 create policy "profiles can read own profile" on profiles for select using (id = auth.uid() or is_admin());
 create policy "admins manage profiles" on profiles for all using (is_admin()) with check (is_admin());
