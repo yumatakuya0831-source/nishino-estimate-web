@@ -26,6 +26,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [data, setDataState] = useState<AppData>(() => loadData());
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(Boolean(supabase));
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
   const [dataLoadingLabel, setDataLoadingLabel] = useState("");
 
@@ -49,8 +50,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = client.auth.onAuthStateChange((_event, nextSession) => {
+    } = client.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
+      setPasswordRecovery(event === "PASSWORD_RECOVERY");
       setAuthLoading(false);
     });
 
@@ -336,6 +338,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     await supabase?.auth.signOut();
     setSession(null);
+    setPasswordRecovery(false);
   };
 
   const value = useMemo<AppContextValue>(
@@ -359,6 +362,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   if (supabase && !session) {
     return <AuthGate />;
+  }
+
+  if (supabase && session && passwordRecovery) {
+    return <PasswordRecoveryGate onComplete={() => setPasswordRecovery(false)} />;
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
@@ -385,7 +392,9 @@ function AuthGate() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -406,6 +415,27 @@ function AuthGate() {
     }
 
     setSubmitting(false);
+  };
+
+  const handlePasswordReset = async () => {
+    if (!supabase || !email) {
+      setResetMessage("パスワード再設定するメールアドレスを入力してください。");
+      return;
+    }
+
+    setResetting(true);
+    setResetMessage("");
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin,
+    });
+
+    setResetMessage(
+      error
+        ? `パスワード再設定メールの送信に失敗しました: ${error.message}`
+        : "パスワード再設定メールを送信しました。メール内のリンクから再設定してください。",
+    );
+    setResetting(false);
   };
 
   return (
@@ -438,6 +468,81 @@ function AuthGate() {
         {message && <p className="error-text">{message}</p>}
         <button className="button" disabled={submitting} type="submit">
           {submitting ? "ログイン中..." : "ログイン"}
+        </button>
+        <button className="button secondary" disabled={resetting} type="button" onClick={() => void handlePasswordReset()}>
+          {resetting ? "送信中..." : "パスワードを再設定"}
+        </button>
+        {resetMessage && <p className={resetMessage.includes("失敗") ? "error-text" : "muted"}>{resetMessage}</p>}
+      </form>
+    </section>
+  );
+}
+
+function PasswordRecoveryGate({ onComplete }: { onComplete: () => void }) {
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase) {
+      return;
+    }
+    if (password.length < 8) {
+      setMessage("パスワードは8文字以上で入力してください。");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setMessage("確認用パスワードが一致しません。");
+      return;
+    }
+
+    setSubmitting(true);
+    setMessage("");
+
+    const { error } = await supabase.auth.updateUser({ password });
+
+    if (error) {
+      setMessage(`パスワードの更新に失敗しました: ${error.message}`);
+      setSubmitting(false);
+      return;
+    }
+
+    setSubmitting(false);
+    onComplete();
+  };
+
+  return (
+    <section className="auth-card">
+      <h1>パスワード再設定</h1>
+      <p className="muted">新しいパスワードを入力してください。</p>
+      <form className="auth-form" onSubmit={handleSubmit}>
+        <div className="field">
+          <label>新しいパスワード</label>
+          <input
+            className="input"
+            autoComplete="new-password"
+            type="password"
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+            required
+          />
+        </div>
+        <div className="field">
+          <label>新しいパスワード（確認）</label>
+          <input
+            className="input"
+            autoComplete="new-password"
+            type="password"
+            value={confirmPassword}
+            onChange={(event) => setConfirmPassword(event.target.value)}
+            required
+          />
+        </div>
+        {message && <p className="error-text">{message}</p>}
+        <button className="button" disabled={submitting} type="submit">
+          {submitting ? "更新中..." : "パスワードを更新"}
         </button>
       </form>
     </section>

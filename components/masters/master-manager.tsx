@@ -57,6 +57,10 @@ export function MasterManager() {
   const [priceTotalCount, setPriceTotalCount] = useState(0);
   const [pricePageLoading, setPricePageLoading] = useState(false);
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+  const [newProfileName, setNewProfileName] = useState("");
+  const [newProfileEmail, setNewProfileEmail] = useState("");
+  const [newProfileRole, setNewProfileRole] = useState<UserRole>("user");
+  const [invitingProfile, setInvitingProfile] = useState(false);
   const [message, setMessage] = useState("");
 
   const disabled = !isAdmin;
@@ -240,6 +244,46 @@ export function MasterManager() {
     });
     showResult("ユーザーマスタ", error);
     return !error;
+  };
+
+  const inviteProfile = async () => {
+    if (!session || disabled || invitingProfile) return;
+
+    setInvitingProfile(true);
+    setMessage("");
+
+    const response = await fetch("/api/admin/users", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email: newProfileEmail,
+        name: newProfileName,
+        role: newProfileRole,
+      }),
+    });
+    const result = (await response.json()) as { profile?: Profile; error?: string };
+
+    if (!response.ok || !result.profile) {
+      setMessage(`ユーザー招待に失敗しました: ${result.error || "入力内容を確認してください。"}`);
+      setInvitingProfile(false);
+      return;
+    }
+
+    const invitedProfile = result.profile;
+    setData((current) => ({
+      ...current,
+      profiles: current.profiles.some((profile) => profile.id === invitedProfile.id)
+        ? current.profiles.map((profile) => (profile.id === invitedProfile.id ? invitedProfile : profile))
+        : [...current.profiles, invitedProfile],
+    }));
+    setNewProfileName("");
+    setNewProfileEmail("");
+    setNewProfileRole("user");
+    setInvitingProfile(false);
+    setMessage("ユーザーを招待しました。招待メールからパスワードを設定してもらってください。");
   };
 
   const updateCustomer = (id: string, patch: Partial<Customer>) => {
@@ -641,6 +685,53 @@ export function MasterManager() {
       {tab === "users" && (
         <section className="panel">
           <h2>ユーザーマスタ</h2>
+          <div className="panel" style={{ marginBottom: 16 }}>
+            <h3>ユーザー追加</h3>
+            <div className="grid cols-3">
+              <div className="field">
+                <label>氏名</label>
+                <input
+                  className="input"
+                  disabled={disabled || invitingProfile}
+                  value={newProfileName}
+                  onChange={(event) => setNewProfileName(event.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>メールアドレス</label>
+                <input
+                  className="input"
+                  disabled={disabled || invitingProfile}
+                  type="email"
+                  value={newProfileEmail}
+                  onChange={(event) => setNewProfileEmail(event.target.value)}
+                />
+              </div>
+              <div className="field">
+                <label>権限</label>
+                <select
+                  className="select"
+                  disabled={disabled || invitingProfile}
+                  value={newProfileRole}
+                  onChange={(event) => setNewProfileRole(event.target.value as UserRole)}
+                >
+                  <option value="user">一般</option>
+                  <option value="admin">管理者</option>
+                </select>
+              </div>
+            </div>
+            <div className="toolbar" style={{ marginTop: 12 }}>
+              <button
+                className="button"
+                disabled={disabled || invitingProfile || !newProfileName || !newProfileEmail}
+                type="button"
+                onClick={() => void inviteProfile()}
+              >
+                {invitingProfile ? "招待中..." : "招待メールを送信"}
+              </button>
+            </div>
+            <p className="muted">追加したユーザーには招待メールが送信されます。メール内のリンクからパスワードを設定してもらってください。</p>
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
