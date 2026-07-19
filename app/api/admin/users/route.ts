@@ -76,9 +76,10 @@ export async function POST(request: Request) {
 
   const { email, name, role } = parsed.data;
   const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || undefined;
+  const redirectTo = origin ? `${origin}/?auth_action=invite` : undefined;
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { name },
-    redirectTo: origin,
+    redirectTo,
   });
 
   if (inviteError || !invited.user) {

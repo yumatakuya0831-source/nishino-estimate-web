@@ -22,6 +22,17 @@ type AppContextValue = {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
+function getAuthActionFromUrl() {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const searchAction = new URLSearchParams(window.location.search).get("auth_action");
+  const hashAction = new URLSearchParams(window.location.hash.replace(/^#/, "")).get("type");
+
+  return searchAction || hashAction || "";
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [data, setDataState] = useState<AppData>(() => loadData());
   const [session, setSession] = useState<Session | null>(null);
@@ -42,6 +53,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const { data: sessionData } = await client.auth.getSession();
       if (!cancelled) {
         setSession(sessionData.session);
+        setPasswordRecovery(["invite", "recovery"].includes(getAuthActionFromUrl()));
         setAuthLoading(false);
       }
     };
@@ -52,7 +64,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       data: { subscription },
     } = client.auth.onAuthStateChange((event, nextSession) => {
       setSession(nextSession);
-      setPasswordRecovery(event === "PASSWORD_RECOVERY");
+      setPasswordRecovery(event === "PASSWORD_RECOVERY" || ["invite", "recovery"].includes(getAuthActionFromUrl()));
       setAuthLoading(false);
     });
 
@@ -427,7 +439,7 @@ function AuthGate() {
     setResetMessage("");
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: window.location.origin,
+      redirectTo: `${window.location.origin}/?auth_action=recovery`,
     });
 
     setResetMessage(
@@ -510,6 +522,7 @@ function PasswordRecoveryGate({ onComplete }: { onComplete: () => void }) {
     }
 
     setSubmitting(false);
+    window.history.replaceState({}, document.title, window.location.pathname);
     onComplete();
   };
 
