@@ -3,10 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
 const createUserSchema = z.object({
-  action: z.enum(["invite", "resend"]).default("invite"),
+  action: z.enum(["invite", "resend", "temporary_password"]).default("invite"),
   email: z.string().email(),
   name: z.string().min(1).optional(),
   role: z.enum(["admin", "user"]).optional(),
+  temporaryPassword: z.string().min(8).optional(),
 });
 
 async function findUserByEmail(admin: ReturnType<typeof getSupabaseAdmin>, email: string) {
@@ -34,6 +35,13 @@ async function findUserByEmail(admin: ReturnType<typeof getSupabaseAdmin>, email
   }
 
   return null;
+}
+
+async function upsertProfile(
+  admin: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  profile: { id: string; name: string; role: "admin" | "user" },
+) {
+  return admin.from("profiles").upsert(profile);
 }
 
 function getSupabaseAdmin() {
@@ -102,7 +110,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "入力内容を確認してください。" }, { status: 400 });
   }
 
-  const { action, email } = parsed.data;
+  const { action, email, temporaryPassword } = parsed.data;
   const name = parsed.data.name || email.split("@")[0];
   const role = parsed.data.role || "user";
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "").replace(/\/$/, "");
@@ -134,6 +142,82 @@ export async function POST(request: Request) {
     });
   }
 
+  if (action === "temporary_password") {
+    if (!temporaryPassword) {
+      return NextResponse.json({ error: "仮パスワードは8文字以上で入力してください。" }, { status: 400 });
+    }
+
+    const existingUser = await findUserByEmail(admin, email);
+
+    if (existingUser) {
+      const { data: updated, error: updateError } = await admin.auth.admin.updateUserById(existingUser.id, {
+        password: temporaryPassword,
+        user_metadata: { ...(existingUser.user_metadata || {}), name },
+      });
+
+      if (updateError || !updated.user) {
+        return NextResponse.json(
+          { error: updateError?.message || "仮パスワードの再設定に失敗しました。" },
+          { status: 400 },
+        );
+      }
+
+      const { error: upsertExistingError } = await upsertProfile(admin, {
+        id: updated.user.id,
+        name,
+        role,
+      });
+
+      if (upsertExistingError) {
+        return NextResponse.json({ error: upsertExistingError.message }, { status: 400 });
+      }
+
+      return NextResponse.json({
+        mode: "temporary_password_reset",
+        profile: {
+          id: updated.user.id,
+          email: updated.user.email || email,
+          name,
+          role,
+        },
+      });
+    }
+
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email,
+      password: temporaryPassword,
+      email_confirm: true,
+      user_metadata: { name },
+    });
+
+    if (createError || !created.user) {
+      return NextResponse.json(
+        { error: createError?.message || "仮パスワードでのユーザー作成に失敗しました。" },
+        { status: 400 },
+      );
+    }
+
+    const { error: upsertError } = await upsertProfile(admin, {
+      id: created.user.id,
+      name,
+      role,
+    });
+
+    if (upsertError) {
+      return NextResponse.json({ error: upsertError.message }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      mode: "temporary_password_created",
+      profile: {
+        id: created.user.id,
+        email: created.user.email || email,
+        name,
+        role,
+      },
+    });
+  }
+
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { name },
     redirectTo: inviteRedirectTo,
@@ -152,7 +236,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: inviteError.message }, { status: 400 });
     }
 
-    const { error: upsertExistingError } = await admin.from("profiles").upsert({
+    const { error: upsertExistingError } = await upsertProfile(admin, {
       id: existingUser.id,
       name,
       role,
@@ -181,7 +265,7 @@ export async function POST(request: Request) {
     });
   }
 
-  const { error: upsertError } = await admin.from("profiles").upsert({
+  const { error: upsertError } = await upsertProfile(admin, {
     id: invited.user.id,
     name,
     role,

@@ -60,6 +60,8 @@ export function MasterManager() {
   const [newProfileName, setNewProfileName] = useState("");
   const [newProfileEmail, setNewProfileEmail] = useState("");
   const [newProfileRole, setNewProfileRole] = useState<UserRole>("user");
+  const [newProfileTemporaryPassword, setNewProfileTemporaryPassword] = useState("");
+  const [newProfilePasswordVisible, setNewProfilePasswordVisible] = useState(false);
   const [invitingProfile, setInvitingProfile] = useState(false);
   const [resendingProfileId, setResendingProfileId] = useState<string | null>(null);
   const [message, setMessage] = useState("");
@@ -93,6 +95,9 @@ export function MasterManager() {
   const displayedPriceItems = supabase ? pricePageItems : localPricePageItems;
   const displayedPriceCount = supabase ? priceTotalCount : localFilteredPriceItems.length;
   const pricePageCount = Math.max(1, Math.ceil(displayedPriceCount / PRICE_PAGE_SIZE));
+  const temporaryPasswordEntered = newProfileTemporaryPassword.trim().length > 0;
+  const temporaryPasswordTooShort = temporaryPasswordEntered && newProfileTemporaryPassword.trim().length < 8;
+  const profileSubmitLabel = temporaryPasswordEntered ? "仮パスワードで登録" : "招待メールを送信";
 
   useEffect(() => {
     setPricePage(1);
@@ -252,6 +257,8 @@ export function MasterManager() {
 
     setInvitingProfile(true);
     setMessage("");
+    const trimmedTemporaryPassword = newProfileTemporaryPassword.trim();
+    const usesTemporaryPassword = trimmedTemporaryPassword.length > 0;
 
     const response = await fetch("/api/admin/users", {
       method: "POST",
@@ -260,16 +267,21 @@ export function MasterManager() {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        action: "invite",
+        action: usesTemporaryPassword ? "temporary_password" : "invite",
         email: newProfileEmail,
         name: newProfileName,
         role: newProfileRole,
+        temporaryPassword: usesTemporaryPassword ? trimmedTemporaryPassword : undefined,
       }),
     });
-    const result = (await response.json()) as { mode?: "invited" | "password_reset"; profile?: Profile; error?: string };
+    const result = (await response.json()) as {
+      mode?: "invited" | "password_reset" | "temporary_password_created" | "temporary_password_reset";
+      profile?: Profile;
+      error?: string;
+    };
 
     if (!response.ok || !result.profile) {
-      setMessage(`ユーザー招待に失敗しました: ${result.error || "入力内容を確認してください。"}`);
+      setMessage(`ユーザー登録に失敗しました: ${result.error || "入力内容を確認してください。"}`);
       setInvitingProfile(false);
       return;
     }
@@ -284,12 +296,18 @@ export function MasterManager() {
     setNewProfileName("");
     setNewProfileEmail("");
     setNewProfileRole("user");
+    setNewProfileTemporaryPassword("");
+    setNewProfilePasswordVisible(false);
     setInvitingProfile(false);
-    setMessage(
-      result.mode === "password_reset"
-        ? "既存ユーザーをユーザーマスタに登録し、パスワード再設定メールを送信しました。"
-        : "ユーザーを招待しました。招待メールからパスワードを設定してもらってください。",
-    );
+    const successMessage =
+      result.mode === "temporary_password_created"
+        ? "仮パスワードでユーザーを作成しました。ユーザーへ仮パスワードを伝えてください。"
+        : result.mode === "temporary_password_reset"
+          ? "既存ユーザーの仮パスワードを再設定しました。ユーザーへ仮パスワードを伝えてください。"
+          : result.mode === "password_reset"
+            ? "既存ユーザーをユーザーマスタに登録し、パスワード再設定メールを送信しました。"
+            : "ユーザーを招待しました。招待メールからパスワードを設定してもらってください。";
+    setMessage(successMessage);
   };
 
   const resendProfilePasswordSetup = async (profile: Profile) => {
@@ -754,18 +772,45 @@ export function MasterManager() {
                   <option value="admin">管理者</option>
                 </select>
               </div>
+              <div className="field">
+                <label>仮パスワード</label>
+                <input
+                  className="input"
+                  disabled={disabled || invitingProfile}
+                  type={newProfilePasswordVisible ? "text" : "password"}
+                  value={newProfileTemporaryPassword}
+                  onChange={(event) => setNewProfileTemporaryPassword(event.target.value)}
+                  placeholder="8文字以上で入力"
+                />
+              </div>
             </div>
             <div className="toolbar" style={{ marginTop: 12 }}>
               <button
+                className="button secondary"
+                disabled={disabled || invitingProfile || !newProfileTemporaryPassword}
+                type="button"
+                onClick={() => setNewProfilePasswordVisible((current) => !current)}
+              >
+                {newProfilePasswordVisible ? "パスワードを非表示" : "パスワードを表示"}
+              </button>
+              <button
                 className="button"
-                disabled={disabled || invitingProfile || !newProfileName || !newProfileEmail}
+                disabled={
+                  disabled ||
+                  invitingProfile ||
+                  !newProfileName ||
+                  !newProfileEmail ||
+                  temporaryPasswordTooShort
+                }
                 type="button"
                 onClick={() => void inviteProfile()}
               >
-                {invitingProfile ? "招待中..." : "招待メールを送信"}
+                {invitingProfile ? "登録中..." : profileSubmitLabel}
               </button>
             </div>
-            <p className="muted">追加したユーザーには招待メールが送信されます。メール内のリンクからパスワードを設定してもらってください。</p>
+            <p className={temporaryPasswordTooShort ? "error-text" : "muted"}>
+              仮パスワードを入力すると、メール送信を使わずにユーザーを作成または既存ユーザーのパスワードを再設定します。空欄の場合は招待メールを送信します。
+            </p>
           </div>
           <div className="table-wrap">
             <table>
