@@ -116,8 +116,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const loadPriceItems = async () => {
       setDataLoading(true);
       setDataLoadingLabel("顧客・工種・会社情報を取得しています");
-      const [{ data: customerRows, error: customersError }, { data: categoryRows, error: categoriesError }, { data: companyRows, error: companyError }] =
-        await Promise.all([
+      const [
+        { data: profileRows, error: profilesError },
+        { data: customerRows, error: customersError },
+        { data: categoryRows, error: categoriesError },
+        { data: companyRows, error: companyError },
+      ] = await Promise.all([
+          client.from("profiles").select("id, name, role").order("created_at", { ascending: true }),
           client
             .from("customers")
             .select("id, name, honorific, price_coefficient, address, phone, memo")
@@ -129,6 +134,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             .limit(1),
         ]);
 
+      if (profilesError) {
+        console.error("Failed to load profiles from Supabase", profilesError);
+      }
       if (customersError) {
         console.error("Failed to load customers from Supabase", customersError);
       }
@@ -149,6 +157,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           phone: row.phone,
           memo: row.memo,
         })) || [];
+
+      const loadedProfiles: Profile[] =
+        profileRows?.map((row) => {
+          const existing = data.profiles.find((profile) => profile.id === row.id);
+          return {
+            id: row.id,
+            name: row.name,
+            email: existing?.email || (row.id === session.user.id ? session.user.email || "" : ""),
+            role: row.role === "admin" ? "admin" : "user",
+          };
+        }) || [];
 
       const loadedCategories: WorkCategory[] =
         categoryRows?.map((row) => ({
@@ -287,6 +306,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setDataState((current) => ({
           ...current,
           customers: loadedCustomers.length > 0 ? loadedCustomers : current.customers,
+          profiles: loadedProfiles.length > 0 ? loadedProfiles : current.profiles,
           workCategories: loadedCategories.length > 0 ? loadedCategories : current.workCategories,
           companySettings: loadedCompanySettings || current.companySettings,
           estimates: loadedEstimates.length > 0 ? loadedEstimates : current.estimates,

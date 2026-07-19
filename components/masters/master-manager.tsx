@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAppData } from "@/components/app-provider";
 import { supabase } from "@/lib/supabase/client";
-import type { CompanySettings, Customer, PriceItem, WorkCategory } from "@/types/domain";
+import type { CompanySettings, Customer, PriceItem, Profile, UserRole, WorkCategory } from "@/types/domain";
 
 type MasterTab = "customers" | "prices" | "categories" | "company" | "users";
 type PriceActiveFilter = "all" | "active" | "inactive";
@@ -45,7 +45,7 @@ function toPriceItem(row: {
 }
 
 export function MasterManager() {
-  const { data, setData, isAdmin, dataLoading, dataLoadingLabel } = useAppData();
+  const { data, setData, isAdmin, dataLoading, dataLoadingLabel, session } = useAppData();
   const [tab, setTab] = useState<MasterTab>("customers");
   const [tabLoading, setTabLoading] = useState(false);
   const [tabLoadingLabel, setTabLoadingLabel] = useState("");
@@ -230,6 +230,16 @@ export function MasterManager() {
     showResult("会社情報", error);
   };
 
+  const persistProfile = async (profile: Profile) => {
+    if (!supabase || disabled) return;
+    const { error } = await supabase.from("profiles").upsert({
+      id: profile.id,
+      name: profile.name,
+      role: profile.role,
+    });
+    showResult("ユーザーマスタ", error);
+  };
+
   const updateCustomer = (id: string, patch: Partial<Customer>) => {
     setData((current) => ({
       ...current,
@@ -257,6 +267,38 @@ export function MasterManager() {
       ...current,
       companySettings: { ...current.companySettings, ...patch },
     }));
+  };
+
+  const updateProfile = (id: string, patch: Partial<Profile>) => {
+    setData((current) => ({
+      ...current,
+      profiles: current.profiles.map((profile) => (profile.id === id ? { ...profile, ...patch } : profile)),
+    }));
+  };
+
+  const deleteProfile = async (profile: Profile) => {
+    if (profile.id === session?.user.id) {
+      setMessage("ログイン中のユーザーは削除できません。別の管理者でログインしてから削除してください。");
+      return;
+    }
+
+    if (!window.confirm(`${profile.name} をユーザーマスタから削除しますか？`)) {
+      return;
+    }
+
+    if (supabase) {
+      const { error } = await supabase.from("profiles").delete().eq("id", profile.id);
+      if (error) {
+        showResult("ユーザーマスタ", error);
+        return;
+      }
+    }
+
+    setData((current) => ({
+      ...current,
+      profiles: current.profiles.filter((item) => item.id !== profile.id),
+    }));
+    setMessage("ユーザーマスタから削除しました。");
   };
 
   const addCustomer = () => {
@@ -603,20 +645,57 @@ export function MasterManager() {
                   <th>氏名</th>
                   <th>メール</th>
                   <th>権限</th>
+                  <th>操作</th>
                 </tr>
               </thead>
               <tbody>
                 {data.profiles.map((profile) => (
                   <tr key={profile.id}>
-                    <td>{profile.name}</td>
-                    <td>{profile.email}</td>
-                    <td><span className="badge">{profile.role === "admin" ? "管理者" : "一般"}</span></td>
+                    <td>
+                      <input
+                        className="input"
+                        disabled={disabled}
+                        value={profile.name}
+                        onBlur={() => void persistProfile(profile)}
+                        onChange={(event) => updateProfile(profile.id, { name: event.target.value })}
+                      />
+                    </td>
+                    <td>{profile.email || <span className="muted">Auth側で管理</span>}</td>
+                    <td>
+                      <select
+                        className="select"
+                        disabled={disabled}
+                        value={profile.role}
+                        onBlur={() => void persistProfile(profile)}
+                        onChange={(event) => {
+                          const nextRole = event.target.value as UserRole;
+                          const next = { ...profile, role: nextRole };
+                          updateProfile(profile.id, { role: nextRole });
+                          void persistProfile(next);
+                        }}
+                      >
+                        <option value="admin">管理者</option>
+                        <option value="user">一般</option>
+                      </select>
+                    </td>
+                    <td>
+                      <button
+                        className="button danger"
+                        disabled={disabled || profile.id === session?.user.id}
+                        type="button"
+                        onClick={() => void deleteProfile(profile)}
+                      >
+                        削除
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="muted">ユーザー追加と権限変更はSupabase Authとprofilesテーブルで管理します。</p>
+          <p className="muted">
+            名前と権限はこの画面で編集できます。ログイン用メールアドレスとAuthユーザー本体はSupabase Auth側で管理します。
+          </p>
         </section>
       )}
     </>

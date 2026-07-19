@@ -83,7 +83,7 @@ create table estimates (
   valid_until date,
   expense_rate numeric(8, 4) not null default 0.15,
   status estimate_status not null default 'draft',
-  created_by uuid references profiles(id),
+  created_by uuid references profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -114,7 +114,7 @@ create table price_import_batches (
   file_path text not null default '',
   file_name text not null,
   status price_import_status not null default 'parsed',
-  created_by uuid references profiles(id),
+  created_by uuid references profiles(id) on delete set null,
   created_at timestamptz not null default now()
 );
 
