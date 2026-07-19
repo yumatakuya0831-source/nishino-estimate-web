@@ -8,6 +8,33 @@ const createUserSchema = z.object({
   role: z.enum(["admin", "user"]),
 });
 
+async function findUserByEmail(admin: ReturnType<typeof getSupabaseAdmin>, email: string) {
+  if (!admin) {
+    return null;
+  }
+
+  const normalizedEmail = email.toLocaleLowerCase();
+
+  for (let page = 1; page <= 20; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+
+    if (error) {
+      throw error;
+    }
+
+    const user = data.users.find((item) => item.email?.toLocaleLowerCase() === normalizedEmail);
+    if (user) {
+      return user;
+    }
+
+    if (data.users.length < 1000) {
+      return null;
+    }
+  }
+
+  return null;
+}
+
 function getSupabaseAdmin() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -76,17 +103,53 @@ export async function POST(request: Request) {
 
   const { email, name, role } = parsed.data;
   const origin = request.headers.get("origin") || process.env.NEXT_PUBLIC_APP_URL || undefined;
-  const redirectTo = origin ? `${origin}/?auth_action=invite` : undefined;
+  const inviteRedirectTo = origin ? `${origin}/?auth_action=invite` : undefined;
+  const recoveryRedirectTo = origin ? `${origin}/?auth_action=recovery` : undefined;
   const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {
     data: { name },
-    redirectTo,
+    redirectTo: inviteRedirectTo,
   });
 
   if (inviteError || !invited.user) {
-    return NextResponse.json(
-      { error: inviteError?.message || "ユーザー招待に失敗しました。" },
-      { status: 400 },
-    );
+    if (!inviteError?.message.toLocaleLowerCase().includes("already been registered")) {
+      return NextResponse.json(
+        { error: inviteError?.message || "ユーザー招待に失敗しました。" },
+        { status: 400 },
+      );
+    }
+
+    const existingUser = await findUserByEmail(admin, email);
+    if (!existingUser) {
+      return NextResponse.json({ error: inviteError.message }, { status: 400 });
+    }
+
+    const { error: upsertExistingError } = await admin.from("profiles").upsert({
+      id: existingUser.id,
+      name,
+      role,
+    });
+
+    if (upsertExistingError) {
+      return NextResponse.json({ error: upsertExistingError.message }, { status: 400 });
+    }
+
+    const { error: resetError } = await userClient.auth.resetPasswordForEmail(email, {
+      redirectTo: recoveryRedirectTo,
+    });
+
+    if (resetError) {
+      return NextResponse.json({ error: resetError.message }, { status: 400 });
+    }
+
+    return NextResponse.json({
+      mode: "password_reset",
+      profile: {
+        id: existingUser.id,
+        email,
+        name,
+        role,
+      },
+    });
   }
 
   const { error: upsertError } = await admin.from("profiles").upsert({
@@ -100,6 +163,7 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json({
+    mode: "invited",
     profile: {
       id: invited.user.id,
       email,

@@ -264,7 +264,7 @@ export function MasterManager() {
         role: newProfileRole,
       }),
     });
-    const result = (await response.json()) as { profile?: Profile; error?: string };
+    const result = (await response.json()) as { mode?: "invited" | "password_reset"; profile?: Profile; error?: string };
 
     if (!response.ok || !result.profile) {
       setMessage(`ユーザー招待に失敗しました: ${result.error || "入力内容を確認してください。"}`);
@@ -283,7 +283,11 @@ export function MasterManager() {
     setNewProfileEmail("");
     setNewProfileRole("user");
     setInvitingProfile(false);
-    setMessage("ユーザーを招待しました。招待メールからパスワードを設定してもらってください。");
+    setMessage(
+      result.mode === "password_reset"
+        ? "既存ユーザーをユーザーマスタに登録し、パスワード再設定メールを送信しました。"
+        : "ユーザーを招待しました。招待メールからパスワードを設定してもらってください。",
+    );
   };
 
   const updateCustomer = (id: string, patch: Partial<Customer>) => {
