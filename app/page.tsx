@@ -6,7 +6,7 @@ import { useAppData } from "@/components/app-provider";
 import { formatCurrency, getGrandTotal } from "@/lib/calculations";
 
 export default function HomePage() {
-  const { data, isAdmin, reset, signOut } = useAppData();
+  const { data, isAdmin, signOut } = useAppData();
   const activeProfile = data.profiles.find((profile) => profile.id === data.activeProfileId);
   const latestEstimates = [...data.estimates].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, 5);
 
@@ -22,11 +22,6 @@ export default function HomePage() {
           <button className="button secondary" type="button" onClick={() => void signOut()}>
             ログアウト
           </button>
-          {isAdmin && (
-            <button className="button secondary" type="button" onClick={reset}>
-              初期データに戻す
-            </button>
-          )}
         </div>
       </div>
 
