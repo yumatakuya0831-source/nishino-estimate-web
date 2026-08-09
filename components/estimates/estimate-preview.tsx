@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useAppData } from "@/components/app-provider";
-import { getCategoryTotal, getDirectCost, getGrandTotal, getOverhead } from "@/lib/calculations";
+import { getCategoryTotal, getDirectCost, getGrandTotal, getLaborCostTotal, getOverhead, isEstimateItemIncluded } from "@/lib/calculations";
 import type { EstimateItem, WorkCategory } from "@/types/domain";
 
 const DETAIL_BODY_ROWS = 20;
@@ -42,7 +42,9 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
       return [];
     }
     return data.workCategories
-      .filter((category) => estimate.items.some((item) => item.workCategoryId === category.id))
+      .filter((category) =>
+        estimate.items.some((item) => item.workCategoryId === category.id && isEstimateItemIncluded(item)),
+      )
       .sort((a, b) => a.sortOrder - b.sortOrder);
   }, [data.workCategories, estimate]);
 
@@ -91,6 +93,7 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
       [],
       ["見積金額", getGrandTotal(estimate)],
       ["直接工事費", getDirectCost(estimate)],
+      ["労務費", getLaborCostTotal(estimate)],
       ["諸経費", getOverhead(estimate)],
       ["経費率", estimate.expenseRate],
       [],
@@ -105,7 +108,8 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
     coverSheet["B10"].z = "#,##0";
     coverSheet["B11"].z = "#,##0";
     coverSheet["B12"].z = "#,##0";
-    coverSheet["B13"].z = "0.0%";
+    coverSheet["B13"].z = "#,##0";
+    coverSheet["B14"].z = "0.0%";
     XLSX.utils.book_append_sheet(workbook, coverSheet, "鏡");
 
     const summaryRows = [
@@ -120,6 +124,7 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
       ]),
       [],
       ["", "直接工事費 計", "", "", getDirectCost(estimate), ""],
+      ["", "うち労務費", "", "", getLaborCostTotal(estimate), ""],
       ["", "諸経費", "", "", getOverhead(estimate), `${estimate.expenseRate * 100}%`],
       ["", "合計", "", "", getGrandTotal(estimate), ""],
     ];
@@ -134,7 +139,9 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
     XLSX.utils.book_append_sheet(workbook, summarySheet, "内訳集計");
 
     visibleCategories.forEach((category) => {
-      const items = estimate.items.filter((item) => item.workCategoryId === category.id);
+      const items = estimate.items.filter(
+        (item) => item.workCategoryId === category.id && isEstimateItemIncluded(item),
+      );
       const detailRows = [
         [category.name],
         [],
@@ -144,8 +151,8 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
           item.specification,
           item.quantity,
           item.unit,
-          item.materialCost,
-          item.laborCost,
+          item.includeMaterialCost ? item.materialCost : "",
+          item.includeLaborCost ? item.laborCost : "",
           item.expense,
           item.unitPrice,
           item.amount,
@@ -183,7 +190,7 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
   const detailPages: DetailPage[] = [];
   visibleCategories.forEach((category) => {
     const categoryItems = estimate.items
-      .filter((item) => item.workCategoryId === category.id)
+      .filter((item) => item.workCategoryId === category.id && isEstimateItemIncluded(item))
       .sort((a, b) => a.sortOrder - b.sortOrder);
     let offset = 0;
     let categoryPageIndex = 0;
@@ -232,7 +239,7 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
       "金額",
       "備考",
     ];
-    const rows = estimate.items.map((item) => {
+    const rows = estimate.items.filter(isEstimateItemIncluded).map((item) => {
       const category = data.workCategories.find((workCategory) => workCategory.id === item.workCategoryId);
       return [
         estimate.estimateNo,
@@ -245,8 +252,8 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
         item.specification,
         item.quantity,
         item.unit,
-        item.materialCost,
-        item.laborCost,
+        item.includeMaterialCost ? item.materialCost : "",
+        item.includeLaborCost ? item.laborCost : "",
         item.expense,
         item.unitPrice,
         item.amount,
@@ -269,7 +276,7 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
       "",
       "",
       getGrandTotal(estimate),
-      `直接工事費:${getDirectCost(estimate)} / 諸経費:${getOverhead(estimate)}`,
+      `直接工事費:${getDirectCost(estimate)} / うち労務費:${getLaborCostTotal(estimate)} / 諸経費:${getOverhead(estimate)}`,
     ]);
 
     const escapeCsv = (value: string | number) => {
@@ -449,6 +456,16 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
               <tr>
                 <th colSpan={6}>直接工事費 計</th>
                 <td className="numeric">{formatAmount(getDirectCost(estimate))}</td>
+                <td />
+              </tr>
+              <tr>
+                <td />
+                <td>うち労務費</td>
+                <td />
+                <td className="numeric">1</td>
+                <td>式</td>
+                <td />
+                <td className="numeric">{formatAmount(getLaborCostTotal(estimate))}</td>
                 <td />
               </tr>
               <tr>

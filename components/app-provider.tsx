@@ -222,7 +222,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           client
             .from("estimate_items")
             .select(
-              "id, estimate_id, work_category_id, price_item_id, name, specification, quantity, unit, material_cost, labor_cost, expense, unit_price, amount, memo, sort_order",
+              "id, estimate_id, work_category_id, price_item_id, name, specification, quantity, unit, material_cost, labor_cost, include_material_cost, include_labor_cost, expense, unit_price, amount, memo, sort_order",
             )
             .order("sort_order", { ascending: true }),
         ]));
@@ -262,6 +262,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
                 unit: itemRow.unit,
                 materialCost: Number(itemRow.material_cost),
                 laborCost: Number(itemRow.labor_cost),
+                includeMaterialCost: itemRow.include_material_cost ?? true,
+                includeLaborCost: itemRow.include_labor_cost ?? true,
                 expense: Number(itemRow.expense),
                 unitPrice: Number(itemRow.unit_price),
                 amount: Number(itemRow.amount),

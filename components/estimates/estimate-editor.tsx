@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Estimate, EstimateItem, WorkCategoryKey } from "@/types/domain";
@@ -13,6 +13,7 @@ import {
   getCategoryTotal,
   getDirectCost,
   getGrandTotal,
+  getLaborCostTotal,
   getOverhead,
   recalculateItem,
 } from "@/lib/calculations";
@@ -20,6 +21,69 @@ import {
 type EstimateEditorProps = {
   estimateId?: string;
 };
+
+type EditableNumberInputProps = {
+  value: number;
+  onValueChange: (value: number) => void;
+  min?: number;
+  step?: number;
+  className?: string;
+};
+
+function EditableNumberInput({
+  value,
+  onValueChange,
+  min = 0,
+  step,
+  className = "input",
+}: EditableNumberInputProps) {
+  const [text, setText] = useState(String(value));
+  const lastValueBeforeClear = useRef(value);
+
+  useEffect(() => {
+    setText(String(value));
+    lastValueBeforeClear.current = value;
+  }, [value]);
+
+  const clearValue = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Backspace" && event.key !== "Delete") {
+      return;
+    }
+    event.preventDefault();
+    if (text !== "") {
+      lastValueBeforeClear.current = Number(text);
+    }
+    setText("");
+  };
+
+  return (
+    <input
+      className={className}
+      type="number"
+      min={min}
+      step={step}
+      value={text}
+      onClick={(event) => event.currentTarget.select()}
+      onFocus={(event) => event.currentTarget.select()}
+      onKeyDown={clearValue}
+      onChange={(event) => {
+        const nextText = event.target.value;
+        setText(nextText);
+        if (nextText !== "") {
+          const nextValue = Number(nextText);
+          lastValueBeforeClear.current = nextValue;
+          onValueChange(nextValue);
+        }
+      }}
+      onBlur={() => {
+        if (text === "") {
+          setText(String(lastValueBeforeClear.current));
+          onValueChange(lastValueBeforeClear.current);
+        }
+      }}
+    />
+  );
+}
 
 function uniqueOptions(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ja-JP"));
@@ -34,6 +98,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
   const [priceSpecificationFilter, setPriceSpecificationFilter] = useState("");
   const [priceConstructionFilter, setPriceConstructionFilter] = useState("");
   const [priceKeyword, setPriceKeyword] = useState("");
+  const [activeEditorTab, setActiveEditorTab] = useState<"search" | "items">("search");
 
   const [estimate, setEstimate] = useState<Estimate>(() => {
     if (existingEstimate) {
@@ -188,6 +253,34 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
     setEstimate((current) => ({ ...current, items: current.items.filter((item) => item.id !== itemId) }));
   };
 
+  const updateLaborCostTotal = (nextTotal: number) => {
+    setEstimate((current) => {
+      const laborItems = current.items.filter(
+        (item) => item.includeLaborCost && item.quantity > 0 && current.priceCoefficientSnapshot > 0,
+      );
+      if (laborItems.length === 0) {
+        return current;
+      }
+
+      const currentTotal = getLaborCostTotal(current);
+      const scale = currentTotal > 0 ? nextTotal / currentTotal : 0;
+      const equalShare = nextTotal / laborItems.length;
+      return {
+        ...current,
+        items: current.items.map((item) => {
+          if (!laborItems.some((laborItem) => laborItem.id === item.id)) {
+            return item;
+          }
+          const laborCost =
+            currentTotal > 0
+              ? item.laborCost * scale
+              : equalShare / (item.quantity * current.priceCoefficientSnapshot);
+          return recalculateItem({ ...item, laborCost }, current.priceCoefficientSnapshot);
+        }),
+      };
+    });
+  };
+
   const saveEstimate = async () => {
     const saved = { ...estimate, updatedAt: new Date().toISOString() };
 
@@ -232,6 +325,8 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
             unit: item.unit,
             material_cost: item.materialCost,
             labor_cost: item.laborCost,
+            include_material_cost: item.includeMaterialCost,
+            include_labor_cost: item.includeLaborCost,
             expense: item.expense,
             unit_price: item.unitPrice,
             amount: item.amount,
@@ -261,7 +356,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
       <div className="page-header">
         <div>
           <h1 className="page-title">{existingEstimate ? "見積編集" : "新規見積"}</h1>
-          <p className="page-subtitle">顧客係数を材料費+労務費+経費に反映して明細金額を計算します。</p>
+          <p className="page-subtitle">明細ごとに材料費・労務費を選択し、編集した金額から見積を計算します。</p>
         </div>
         <div className="toolbar">
           <button className="button" type="button" onClick={saveEstimate}>
@@ -322,12 +417,10 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
             </div>
             <div className="field">
               <label>諸経費率</label>
-              <input
-                className="input"
-                type="number"
-                step="0.01"
+              <EditableNumberInput
                 value={estimate.expenseRate}
-                onChange={(event) => setEstimate({ ...estimate, expenseRate: Number(event.target.value) })}
+                step={0.01}
+                onValueChange={(value) => setEstimate({ ...estimate, expenseRate: value })}
               />
             </div>
             <div className="field">
@@ -339,7 +432,15 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
 
         <section className="panel">
           <h2>合計</h2>
-          <div className="grid cols-3">
+          <div className="estimate-summary-grid">
+            <div>
+              <div className="muted">労務費</div>
+              <EditableNumberInput
+                className="input numeric estimate-summary-input"
+                value={getLaborCostTotal(estimate)}
+                onValueChange={updateLaborCostTotal}
+              />
+            </div>
             <div>
               <div className="muted">直接工事費</div>
               <div className="summary-number">{formatCurrency(getDirectCost(estimate))}</div>
@@ -357,7 +458,32 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
         </section>
       </div>
 
-      <section className="panel" style={{ marginTop: 16 }}>
+      <nav aria-label="見積編集メニュー" className="estimate-editor-tabs" role="tablist">
+        <button
+          aria-selected={activeEditorTab === "search"}
+          className={activeEditorTab === "search" ? "estimate-editor-tab active" : "estimate-editor-tab"}
+          role="tab"
+          type="button"
+          onClick={() => setActiveEditorTab("search")}
+        >
+          単価を探す
+        </button>
+        <button
+          aria-selected={activeEditorTab === "items"}
+          className={activeEditorTab === "items" ? "estimate-editor-tab active" : "estimate-editor-tab"}
+          role="tab"
+          type="button"
+          onClick={() => setActiveEditorTab("items")}
+        >
+          見積明細
+          <span className="estimate-editor-tab-meta">
+            {estimate.items.length}件・{formatCurrency(getGrandTotal(estimate))}
+          </span>
+        </button>
+      </nav>
+
+      {activeEditorTab === "search" && (
+      <section className="panel estimate-editor-tab-panel" role="tabpanel">
         <h2>単価マスタ検索</h2>
         <div className="grid cols-3">
           <div className="field">
@@ -478,10 +604,15 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
           </table>
         </div>
       </section>
+      )}
 
-      <section className="panel" style={{ marginTop: 16 }}>
+      {activeEditorTab === "items" && (
+      <section className="panel estimate-editor-tab-panel" role="tabpanel">
         <h2>工種別明細</h2>
-        {data.workCategories.map((category) => {
+        {estimate.items.length === 0 && <p className="muted">選択した明細はありません。「単価を探す」から追加してください。</p>}
+        {data.workCategories.filter((category) =>
+          estimate.items.some((item) => item.workCategoryId === category.id),
+        ).map((category) => {
           const items = estimate.items.filter((item) => item.workCategoryId === category.id);
           return (
             <div className="paper-section" key={category.id}>
@@ -496,6 +627,10 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                       <th>仕様</th>
                       <th>数量</th>
                       <th>単位</th>
+                      <th>費用選択</th>
+                      <th>材料費</th>
+                      <th>労務費</th>
+                      <th>明細経費</th>
                       <th>単価</th>
                       <th>金額</th>
                       <th>備考</th>
@@ -505,7 +640,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                   <tbody>
                     {items.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="muted">
+                        <td colSpan={12} className="muted">
                           明細はありません。
                         </td>
                       </tr>
@@ -523,14 +658,53 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                             />
                           </td>
                           <td>
-                            <input
-                              className="input"
-                              type="number"
+                            <EditableNumberInput
                               value={item.quantity}
-                              onChange={(event) => updateItem(item.id, { quantity: Number(event.target.value) })}
+                              onValueChange={(value) => updateItem(item.id, { quantity: value })}
                             />
                           </td>
-                          <td>{item.unit}</td>
+                          <td>
+                            <input className="input" value={item.unit} onChange={(event) => updateItem(item.id, { unit: event.target.value })} />
+                          </td>
+                          <td>
+                            <label className="checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={item.includeMaterialCost}
+                                onChange={(event) => updateItem(item.id, { includeMaterialCost: event.target.checked })}
+                              />
+                              材料
+                            </label>
+                            <label className="checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={item.includeLaborCost}
+                                onChange={(event) => updateItem(item.id, { includeLaborCost: event.target.checked })}
+                              />
+                              労務
+                            </label>
+                          </td>
+                          <td>
+                            <EditableNumberInput
+                              className="input numeric"
+                              value={item.materialCost}
+                              onValueChange={(value) => updateItem(item.id, { materialCost: value })}
+                            />
+                          </td>
+                          <td>
+                            <EditableNumberInput
+                              className="input numeric"
+                              value={item.laborCost}
+                              onValueChange={(value) => updateItem(item.id, { laborCost: value })}
+                            />
+                          </td>
+                          <td>
+                            <EditableNumberInput
+                              className="input numeric"
+                              value={item.expense}
+                              onValueChange={(value) => updateItem(item.id, { expense: value })}
+                            />
+                          </td>
                           <td className="numeric">{formatCurrency(item.unitPrice)}</td>
                           <td className="numeric">{formatCurrency(item.amount)}</td>
                           <td>
@@ -551,6 +725,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
           );
         })}
       </section>
+      )}
     </>
   );
 }

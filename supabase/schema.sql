@@ -101,6 +101,8 @@ create table estimate_items (
   unit text not null default '式',
   material_cost numeric(14, 2) not null default 0,
   labor_cost numeric(14, 2) not null default 0,
+  include_material_cost boolean not null default true,
+  include_labor_cost boolean not null default true,
   expense numeric(14, 2) not null default 0,
   unit_price numeric(14, 2) not null default 0,
   amount numeric(14, 2) not null default 0,

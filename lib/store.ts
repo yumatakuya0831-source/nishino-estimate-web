@@ -55,7 +55,18 @@ export function loadData(): AppData {
     return data;
   }
   try {
-    return JSON.parse(raw) as AppData;
+    const data = JSON.parse(raw) as AppData;
+    return {
+      ...data,
+      estimates: data.estimates.map((estimate) => ({
+        ...estimate,
+        items: estimate.items.map((item) => ({
+          ...item,
+          includeMaterialCost: item.includeMaterialCost ?? true,
+          includeLaborCost: item.includeLaborCost ?? true,
+        })),
+      })),
+    };
   } catch {
     const data = createDefaultData();
     saveData(data);

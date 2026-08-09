@@ -25,6 +25,8 @@ export function createEstimateItemFromPriceItem(
     unit: priceItem.unit,
     materialCost: priceItem.materialCost,
     laborCost: priceItem.laborCost,
+    includeMaterialCost: true,
+    includeLaborCost: true,
     expense: priceItem.expense,
     unitPrice,
     amount: unitPrice,
@@ -34,12 +36,20 @@ export function createEstimateItemFromPriceItem(
 }
 
 export function recalculateItem(item: EstimateItem, priceCoefficient: number): EstimateItem {
-  const unitPrice = (item.materialCost + item.laborCost + item.expense) * priceCoefficient;
+  const isIncluded = isEstimateItemIncluded(item);
+  const selectedCost =
+    (item.includeMaterialCost ? item.materialCost : 0) +
+    (item.includeLaborCost ? item.laborCost : 0);
+  const unitPrice = isIncluded ? (selectedCost + item.expense) * priceCoefficient : 0;
   return {
     ...item,
     unitPrice,
     amount: item.quantity * unitPrice,
   };
+}
+
+export function isEstimateItemIncluded(item: EstimateItem): boolean {
+  return item.includeMaterialCost || item.includeLaborCost;
 }
 
 export function getCategoryTotal(estimate: Estimate, workCategoryId: WorkCategoryKey): number {
@@ -50,6 +60,17 @@ export function getCategoryTotal(estimate: Estimate, workCategoryId: WorkCategor
 
 export function getDirectCost(estimate: Estimate): number {
   return estimate.items.reduce((sum, item) => sum + item.amount, 0);
+}
+
+export function getLaborCostTotal(estimate: Estimate): number {
+  return Math.round(estimate.items.reduce(
+    (sum, item) =>
+      sum +
+      (item.includeLaborCost
+        ? item.quantity * item.laborCost * estimate.priceCoefficientSnapshot
+        : 0),
+    0,
+  ));
 }
 
 export function getOverhead(estimate: Estimate): number {

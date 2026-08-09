@@ -73,6 +73,8 @@ export type EstimateItem = {
   unit: string;
   materialCost: number;
   laborCost: number;
+  includeMaterialCost: boolean;
+  includeLaborCost: boolean;
   expense: number;
   unitPrice: number;
   amount: number;
