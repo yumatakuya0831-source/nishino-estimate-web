@@ -89,6 +89,18 @@ function uniqueOptions(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ja-JP"));
 }
 
+function isUuid(value: string | undefined): value is string {
+  return Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
+}
+
+function nullableUuid(value: string | undefined): string | null {
+  return isUuid(value) ? value : null;
+}
+
+function uuidOrNew(value: string): string {
+  return isUuid(value) ? value : crypto.randomUUID();
+}
+
 export function EstimateEditor({ estimateId }: EstimateEditorProps) {
   const router = useRouter();
   const { data, setData, session } = useAppData();
@@ -282,13 +294,21 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
   };
 
   const saveEstimate = async () => {
-    const saved = { ...estimate, updatedAt: new Date().toISOString() };
+    const saved = {
+      ...estimate,
+      id: supabase && session ? uuidOrNew(estimate.id) : estimate.id,
+      updatedAt: new Date().toISOString(),
+      items:
+        supabase && session
+          ? estimate.items.map((item) => ({ ...item, id: uuidOrNew(item.id) }))
+          : estimate.items,
+    };
 
     if (supabase && session) {
       const { error: estimateError } = await supabase.from("estimates").upsert({
         id: saved.id,
         estimate_no: saved.estimateNo,
-        customer_id: saved.customerId || null,
+        customer_id: nullableUuid(saved.customerId),
         customer_name_snapshot: saved.customerNameSnapshot,
         customer_honorific_snapshot: saved.customerHonorificSnapshot,
         price_coefficient_snapshot: saved.priceCoefficientSnapshot,
@@ -318,7 +338,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
             id: item.id,
             estimate_id: saved.id,
             work_category_id: item.workCategoryId,
-            price_item_id: item.priceItemId || null,
+            price_item_id: nullableUuid(item.priceItemId),
             name: item.name,
             specification: item.specification,
             quantity: item.quantity,
