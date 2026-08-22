@@ -1,7 +1,7 @@
 import type { Estimate, EstimateItem, PriceItem, WorkCategoryKey } from "@/types/domain";
 
 export function getBaseUnitPrice(item: Pick<PriceItem, "materialCost" | "laborCost" | "expense">): number {
-  return item.materialCost + item.laborCost + item.expense;
+  return item.materialCost + item.laborCost;
 }
 
 export function createEstimateItemFromPriceItem(
@@ -33,7 +33,7 @@ export function createEstimateItemFromPriceItem(
 
 export function recalculateItem(item: EstimateItem, priceCoefficient: number): EstimateItem {
   const selectedCost = (item.includeMaterialCost ? item.materialCost : 0) + item.laborCost;
-  const unitPrice = (selectedCost + item.expense) * priceCoefficient;
+  const unitPrice = selectedCost * priceCoefficient;
   return {
     ...item,
     unitPrice,
@@ -65,7 +65,12 @@ export function getLaborCostTotal(estimate: Estimate): number {
 }
 
 export function getOverhead(estimate: Estimate): number {
-  return Math.round(getDirectCost(estimate) * estimate.expenseRate);
+  return Math.round(estimate.items.reduce(
+    (sum, item) =>
+      sum +
+      item.quantity * item.expense * estimate.priceCoefficientSnapshot,
+    0,
+  ));
 }
 
 export function getGrandTotal(estimate: Estimate): number {

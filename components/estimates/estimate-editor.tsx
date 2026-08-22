@@ -435,12 +435,8 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
               />
             </div>
             <div className="field">
-              <label>諸経費率</label>
-              <EditableNumberInput
-                value={estimate.expenseRate}
-                step={0.01}
-                onValueChange={(value) => setEstimate({ ...estimate, expenseRate: value })}
-              />
+              <label>諸経費計算</label>
+              <input className="input" value="明細経費の合計" readOnly />
             </div>
             <div className="field">
               <label>顧客係数</label>

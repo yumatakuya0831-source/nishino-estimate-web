@@ -95,7 +95,6 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
       ["直接工事費", getDirectCost(estimate)],
       ["労務費", getLaborCostTotal(estimate)],
       ["諸経費", getOverhead(estimate)],
-      ["経費率", estimate.expenseRate],
       [],
       ["会社名", data.companySettings.companyName],
       ["郵便番号", data.companySettings.postalCode],
@@ -109,7 +108,6 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
     coverSheet["B11"].z = "#,##0";
     coverSheet["B12"].z = "#,##0";
     coverSheet["B13"].z = "#,##0";
-    coverSheet["B14"].z = "0.0%";
     XLSX.utils.book_append_sheet(workbook, coverSheet, "鏡");
 
     const summaryRows = [
@@ -125,7 +123,7 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
       [],
       ["", "直接工事費 計", "", "", getDirectCost(estimate), ""],
       ["", "労務費", "", "", getLaborCostTotal(estimate), ""],
-      ["", "諸経費", "", "", getOverhead(estimate), `${estimate.expenseRate * 100}%`],
+      ["", "諸経費", "", "", getOverhead(estimate), "明細経費合計"],
       ["", "合計", "", "", getGrandTotal(estimate), ""],
     ];
     const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);

@@ -719,18 +719,6 @@ export function MasterManager() {
                 />
               </div>
             ))}
-            <div className="field">
-              <label>初期諸経費率</label>
-              <input
-                className="input"
-                disabled={disabled}
-                type="number"
-                step="0.01"
-                value={data.companySettings.defaultExpenseRate}
-                onBlur={() => void persistCompanySettings(data.companySettings)}
-                onChange={(event) => updateCompanySettings({ defaultExpenseRate: Number(event.target.value) })}
-              />
-            </div>
           </div>
         </section>
       )}
