@@ -750,7 +750,7 @@ th {
   border-radius: 12px;
   display: grid;
   gap: 6px;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 16px;
   padding: 6px;
   position: sticky;
@@ -800,7 +800,72 @@ th {
   max-width: 180px;
 }
 
+.estimate-review-header {
+  align-items: flex-start;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.estimate-review-cover {
+  background: #fff;
+  border: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 18px;
+}
+
+.estimate-review-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  text-align: center;
+}
+
+.estimate-review-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  justify-content: space-between;
+}
+
+.estimate-review-project {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 90px 1fr;
+  padding-top: 12px;
+}
+
+.estimate-review-total {
+  align-items: baseline;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 90px 1fr;
+}
+
+.estimate-review-total strong {
+  border-bottom: 2px solid var(--text);
+  font-size: 24px;
+  padding-bottom: 4px;
+}
+
+.estimate-review-summary,
+.estimate-review-category-totals {
+  margin-bottom: 16px;
+}
+
 @media (max-width: 900px) {
+  .estimate-editor-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .estimate-review-header {
+    display: block;
+  }
+
   .estimate-summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

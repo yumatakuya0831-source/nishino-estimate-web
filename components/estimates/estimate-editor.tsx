@@ -110,7 +110,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
   const [priceSpecificationFilter, setPriceSpecificationFilter] = useState("");
   const [priceConstructionFilter, setPriceConstructionFilter] = useState("");
   const [priceKeyword, setPriceKeyword] = useState("");
-  const [activeEditorTab, setActiveEditorTab] = useState<"search" | "items">("search");
+  const [activeEditorTab, setActiveEditorTab] = useState<"search" | "items" | "preview">("search");
 
   const [estimate, setEstimate] = useState<Estimate>(() => {
     if (existingEstimate) {
@@ -379,8 +379,8 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
           <p className="page-subtitle">明細ごとに材料費・労務費を選択し、編集した金額から見積を計算します。</p>
         </div>
         <div className="toolbar">
-          <button className="button" type="button" onClick={saveEstimate}>
-            保存してプレビュー
+          <button className="button" type="button" onClick={() => setActiveEditorTab("preview")}>
+            プレビュー
           </button>
           <Link className="button secondary" href="/">
             メニューへ戻る
@@ -499,6 +499,16 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
           <span className="estimate-editor-tab-meta">
             {estimate.items.length}件・{formatCurrency(getGrandTotal(estimate))}
           </span>
+        </button>
+        <button
+          aria-selected={activeEditorTab === "preview"}
+          className={activeEditorTab === "preview" ? "estimate-editor-tab active" : "estimate-editor-tab"}
+          role="tab"
+          type="button"
+          onClick={() => setActiveEditorTab("preview")}
+        >
+          プレビュー
+          <span className="estimate-editor-tab-meta">保存前確認</span>
         </button>
       </nav>
 
@@ -744,6 +754,201 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
             </div>
           );
         })}
+      </section>
+      )}
+
+      {activeEditorTab === "preview" && (
+      <section className="panel estimate-editor-tab-panel" role="tabpanel">
+        <div className="estimate-review-header">
+          <div>
+            <h2>保存前プレビュー</h2>
+            <p className="muted">PDF画面へ進む前に、帳票に載る内容と金額を確認・修正できます。</p>
+          </div>
+          <div className="toolbar">
+            <button className="button secondary" type="button" onClick={() => setActiveEditorTab("items")}>
+              明細を修正
+            </button>
+            <button className="button" type="button" onClick={saveEstimate}>
+              保存してPDFプレビュー
+            </button>
+          </div>
+        </div>
+
+        <div className="estimate-review-cover">
+          <div className="estimate-review-title">御 見 積 書</div>
+          <div className="estimate-review-meta">
+            <span>見積番号: {estimate.estimateNo}</span>
+            <span>顧客: {estimate.customerNameSnapshot} {estimate.customerHonorificSnapshot}</span>
+          </div>
+          <div className="estimate-review-project">
+            <span>工事名称</span>
+            <strong>{estimate.projectName || "未入力"}</strong>
+          </div>
+          <div className="estimate-review-total">
+            <span>見積金額</span>
+            <strong>{formatCurrency(getGrandTotal(estimate))}</strong>
+          </div>
+        </div>
+
+        <div className="estimate-summary-grid estimate-review-summary">
+          <div>
+            <div className="muted">労務費</div>
+            <EditableNumberInput
+              className="input numeric estimate-summary-input"
+              value={getLaborCostTotal(estimate)}
+              onValueChange={updateLaborCostTotal}
+            />
+          </div>
+          <div>
+            <div className="muted">直接工事費</div>
+            <div className="summary-number">{formatCurrency(getDirectCost(estimate))}</div>
+          </div>
+          <div>
+            <div className="muted">諸経費</div>
+            <div className="summary-number">{formatCurrency(getOverhead(estimate))}</div>
+          </div>
+          <div>
+            <div className="muted">総額</div>
+            <div className="summary-number">{formatCurrency(getGrandTotal(estimate))}</div>
+          </div>
+        </div>
+
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>工種</th>
+                <th>名称</th>
+                <th>仕様</th>
+                <th>数量</th>
+                <th>単位</th>
+                <th>費用選択</th>
+                <th>材料費</th>
+                <th>労務費</th>
+                <th>経費</th>
+                <th>単価</th>
+                <th>金額</th>
+                <th>備考</th>
+              </tr>
+            </thead>
+            <tbody>
+              {estimate.items.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="muted">
+                    明細はありません。「単価を探す」から追加してください。
+                  </td>
+                </tr>
+              ) : (
+                estimate.items.map((item) => {
+                  const category = data.workCategories.find((workCategory) => workCategory.id === item.workCategoryId);
+                  return (
+                    <tr key={item.id}>
+                      <td>{category?.name || item.workCategoryId}</td>
+                      <td>{item.name}</td>
+                      <td>{item.specification}</td>
+                      <td>
+                        <EditableNumberInput
+                          className="input numeric"
+                          value={item.quantity}
+                          onValueChange={(value) => updateItem(item.id, { quantity: value })}
+                        />
+                      </td>
+                      <td>{item.unit}</td>
+                      <td>
+                        <label className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={item.includeMaterialCost}
+                            onChange={(event) => updateItem(item.id, { includeMaterialCost: event.target.checked })}
+                          />
+                          材料
+                        </label>
+                        <label className="checkbox-label">
+                          <input
+                            type="checkbox"
+                            checked={item.includeLaborCost}
+                            onChange={(event) => updateItem(item.id, { includeLaborCost: event.target.checked })}
+                          />
+                          労務
+                        </label>
+                      </td>
+                      <td>
+                        <EditableNumberInput
+                          className="input numeric"
+                          value={item.materialCost}
+                          onValueChange={(value) => updateItem(item.id, { materialCost: value })}
+                        />
+                      </td>
+                      <td>
+                        <EditableNumberInput
+                          className="input numeric"
+                          value={item.laborCost}
+                          onValueChange={(value) => updateItem(item.id, { laborCost: value })}
+                        />
+                      </td>
+                      <td>
+                        <EditableNumberInput
+                          className="input numeric"
+                          value={item.expense}
+                          onValueChange={(value) => updateItem(item.id, { expense: value })}
+                        />
+                      </td>
+                      <td className="numeric">{formatCurrency(item.unitPrice)}</td>
+                      <td className="numeric">{formatCurrency(item.amount)}</td>
+                      <td>
+                        <input className="input" value={item.memo} onChange={(event) => updateItem(item.id, { memo: event.target.value })} />
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {data.workCategories.filter((category) =>
+          estimate.items.some((item) => item.workCategoryId === category.id),
+        ).length > 0 && (
+          <div className="estimate-review-category-totals">
+            <h3>内訳集計</h3>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>工種</th>
+                    <th>数量</th>
+                    <th>単位</th>
+                    <th>金額</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.workCategories.filter((category) =>
+                    estimate.items.some((item) => item.workCategoryId === category.id),
+                  ).map((category) => (
+                    <tr key={category.id}>
+                      <td>{category.name}</td>
+                      <td className="numeric">1</td>
+                      <td>式</td>
+                      <td className="numeric">{formatCurrency(getCategoryTotal(estimate, category.id))}</td>
+                    </tr>
+                  ))}
+                  <tr>
+                    <th colSpan={3}>直接工事費 計</th>
+                    <td className="numeric">{formatCurrency(getDirectCost(estimate))}</td>
+                  </tr>
+                  <tr>
+                    <th colSpan={3}>諸経費</th>
+                    <td className="numeric">{formatCurrency(getOverhead(estimate))}</td>
+                  </tr>
+                  <tr>
+                    <th colSpan={3}>合計</th>
+                    <td className="numeric">{formatCurrency(getGrandTotal(estimate))}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </section>
       )}
     </>
