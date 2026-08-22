@@ -1,9 +1,5 @@
 import type { Estimate, EstimateItem, PriceItem, WorkCategoryKey } from "@/types/domain";
 
-export function roundDownToHundreds(value: number): number {
-  return Math.floor(value / 100) * 100;
-}
-
 export function getBaseUnitPrice(item: Pick<PriceItem, "materialCost" | "laborCost" | "expense">): number {
   return item.materialCost + item.laborCost + item.expense;
 }
@@ -36,11 +32,8 @@ export function createEstimateItemFromPriceItem(
 }
 
 export function recalculateItem(item: EstimateItem, priceCoefficient: number): EstimateItem {
-  const isIncluded = isEstimateItemIncluded(item);
-  const selectedCost =
-    (item.includeMaterialCost ? item.materialCost : 0) +
-    (item.includeLaborCost ? item.laborCost : 0);
-  const unitPrice = isIncluded ? (selectedCost + item.expense) * priceCoefficient : 0;
+  const selectedCost = (item.includeMaterialCost ? item.materialCost : 0) + item.laborCost;
+  const unitPrice = (selectedCost + item.expense) * priceCoefficient;
   return {
     ...item,
     unitPrice,
@@ -49,7 +42,7 @@ export function recalculateItem(item: EstimateItem, priceCoefficient: number): E
 }
 
 export function isEstimateItemIncluded(item: EstimateItem): boolean {
-  return item.includeMaterialCost || item.includeLaborCost;
+  return item.includeMaterialCost || item.laborCost > 0 || item.expense > 0;
 }
 
 export function getCategoryTotal(estimate: Estimate, workCategoryId: WorkCategoryKey): number {
@@ -66,15 +59,13 @@ export function getLaborCostTotal(estimate: Estimate): number {
   return Math.round(estimate.items.reduce(
     (sum, item) =>
       sum +
-      (item.includeLaborCost
-        ? item.quantity * item.laborCost * estimate.priceCoefficientSnapshot
-        : 0),
+      item.quantity * item.laborCost * estimate.priceCoefficientSnapshot,
     0,
   ));
 }
 
 export function getOverhead(estimate: Estimate): number {
-  return roundDownToHundreds(getDirectCost(estimate) * estimate.expenseRate);
+  return Math.round(getDirectCost(estimate) * estimate.expenseRate);
 }
 
 export function getGrandTotal(estimate: Estimate): number {

@@ -267,27 +267,13 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
 
   const updateLaborCostTotal = (nextTotal: number) => {
     setEstimate((current) => {
-      const checkedLaborItems = current.items.filter(
-        (item) => item.includeLaborCost && item.quantity > 0 && current.priceCoefficientSnapshot > 0,
-      );
-      const laborItems =
-        checkedLaborItems.length > 0
-          ? checkedLaborItems
-          : current.items.filter((item) => item.quantity > 0 && current.priceCoefficientSnapshot > 0);
+      const laborItems = current.items.filter((item) => item.quantity > 0 && current.priceCoefficientSnapshot > 0);
 
       if (laborItems.length === 0) {
         return current;
       }
 
-      const currentTotal =
-        checkedLaborItems.length > 0
-          ? getLaborCostTotal(current)
-          : Math.round(
-              laborItems.reduce(
-                (sum, item) => sum + item.quantity * item.laborCost * current.priceCoefficientSnapshot,
-                0,
-              ),
-            );
+      const currentTotal = getLaborCostTotal(current);
       const scale = currentTotal > 0 ? nextTotal / currentTotal : 0;
       const equalShare = nextTotal / laborItems.length;
       return {
@@ -300,7 +286,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
             currentTotal > 0
               ? item.laborCost * scale
               : equalShare / (item.quantity * current.priceCoefficientSnapshot);
-          return recalculateItem({ ...item, includeLaborCost: true, laborCost }, current.priceCoefficientSnapshot);
+          return recalculateItem({ ...item, laborCost }, current.priceCoefficientSnapshot);
         }),
       };
     });
@@ -389,7 +375,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
       <div className="page-header">
         <div>
           <h1 className="page-title">{existingEstimate ? "見積編集" : "新規見積"}</h1>
-          <p className="page-subtitle">明細ごとに材料費・労務費を選択し、編集した金額から見積を計算します。</p>
+          <p className="page-subtitle">材料費は計算対象を選択し、労務費は帳票表示を切り替えます。労務費合計は現場難易度に合わせて調整できます。</p>
         </div>
         <div className="toolbar">
           <button className="button" type="button" onClick={() => setActiveEditorTab("preview")}>
@@ -670,7 +656,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                       <th>仕様</th>
                       <th>数量</th>
                       <th>単位</th>
-                      <th>費用選択</th>
+                      <th>計算/表示</th>
                       <th>材料費</th>
                       <th>労務費</th>
                       <th>明細経費</th>
@@ -716,7 +702,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                                 checked={item.includeMaterialCost}
                                 onChange={(event) => updateItem(item.id, { includeMaterialCost: event.target.checked })}
                               />
-                              材料
+                              材料を計算
                             </label>
                             <label className="checkbox-label">
                               <input
@@ -724,7 +710,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                                 checked={item.includeLaborCost}
                                 onChange={(event) => updateItem(item.id, { includeLaborCost: event.target.checked })}
                               />
-                              労務
+                              労務を表示
                             </label>
                           </td>
                           <td>
@@ -835,7 +821,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                 <th>仕様</th>
                 <th>数量</th>
                 <th>単位</th>
-                <th>費用選択</th>
+                <th>計算/表示</th>
                 <th>材料費</th>
                 <th>労務費</th>
                 <th>経費</th>
@@ -874,7 +860,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                             checked={item.includeMaterialCost}
                             onChange={(event) => updateItem(item.id, { includeMaterialCost: event.target.checked })}
                           />
-                          材料
+                          材料を計算
                         </label>
                         <label className="checkbox-label">
                           <input
@@ -882,7 +868,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                             checked={item.includeLaborCost}
                             onChange={(event) => updateItem(item.id, { includeLaborCost: event.target.checked })}
                           />
-                          労務
+                          労務を表示
                         </label>
                       </td>
                       <td>
