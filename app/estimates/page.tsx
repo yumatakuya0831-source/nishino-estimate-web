@@ -1,11 +1,45 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { useAppData } from "@/components/app-provider";
 import { formatCurrency, getDirectCost, getGrandTotal, getOverhead } from "@/lib/calculations";
+import { supabase } from "@/lib/supabase/client";
 
 export default function EstimatesPage() {
-  const { data } = useAppData();
+  const { data, setData, isAdmin, session } = useAppData();
+  const [deletingEstimateId, setDeletingEstimateId] = useState<string | null>(null);
+  const canDeleteEstimates = isAdmin || !supabase;
+
+  const deleteEstimate = async (estimateId: string, estimateNo: string) => {
+    if (!canDeleteEstimates) {
+      window.alert("見積を削除できるのは管理者のみです。");
+      return;
+    }
+
+    const confirmed = window.confirm(`見積番号「${estimateNo}」を削除しますか？\n削除した見積は元に戻せません。`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingEstimateId(estimateId);
+    try {
+      if (supabase && session) {
+        const { error } = await supabase.from("estimates").delete().eq("id", estimateId);
+        if (error) {
+          window.alert(`見積の削除に失敗しました: ${error.message}`);
+          return;
+        }
+      }
+
+      setData((current) => ({
+        ...current,
+        estimates: current.estimates.filter((estimate) => estimate.id !== estimateId),
+      }));
+    } finally {
+      setDeletingEstimateId(null);
+    }
+  };
 
   return (
     <>
@@ -50,6 +84,16 @@ export default function EstimatesPage() {
                       <Link className="button secondary" href={`/estimates/${estimate.id}/preview`}>
                         印刷/PDF
                       </Link>
+                      {canDeleteEstimates && (
+                        <button
+                          className="button danger"
+                          disabled={deletingEstimateId === estimate.id}
+                          type="button"
+                          onClick={() => void deleteEstimate(estimate.id, estimate.estimateNo)}
+                        >
+                          {deletingEstimateId === estimate.id ? "削除中" : "削除"}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
