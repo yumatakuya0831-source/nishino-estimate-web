@@ -261,6 +261,11 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
     }));
   };
 
+  const getCoefficientAppliedCost = (value: number) => Math.round(value * estimate.priceCoefficientSnapshot);
+
+  const getBaseCostFromCoefficientAppliedCost = (value: number) =>
+    estimate.priceCoefficientSnapshot > 0 ? value / estimate.priceCoefficientSnapshot : value;
+
   const removeItem = (itemId: string) => {
     setEstimate((current) => ({ ...current, items: current.items.filter((item) => item.id !== itemId) }));
   };
@@ -808,6 +813,9 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
           </div>
         </div>
 
+        <p className="muted">
+          保存前プレビューの材料費・労務費は顧客係数 {estimate.priceCoefficientSnapshot} を反映した金額です。この注記は見積書には表示されません。
+        </p>
         <div className="table-wrap">
           <table>
             <thead>
@@ -818,8 +826,8 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                 <th>数量</th>
                 <th>単位</th>
                 <th>計算/表示</th>
-                <th>材料費</th>
-                <th>労務費</th>
+                <th>材料費（係数後）</th>
+                <th>労務費（係数後）</th>
                 <th>経費</th>
                 <th>単価</th>
                 <th>金額</th>
@@ -870,15 +878,15 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                       <td>
                         <EditableNumberInput
                           className="input numeric"
-                          value={item.materialCost}
-                          onValueChange={(value) => updateItem(item.id, { materialCost: value })}
+                          value={getCoefficientAppliedCost(item.materialCost)}
+                          onValueChange={(value) => updateItem(item.id, { materialCost: getBaseCostFromCoefficientAppliedCost(value) })}
                         />
                       </td>
                       <td>
                         <EditableNumberInput
                           className="input numeric"
-                          value={item.laborCost}
-                          onValueChange={(value) => updateItem(item.id, { laborCost: value })}
+                          value={getCoefficientAppliedCost(item.laborCost)}
+                          onValueChange={(value) => updateItem(item.id, { laborCost: getBaseCostFromCoefficientAppliedCost(value) })}
                         />
                       </td>
                       <td>
