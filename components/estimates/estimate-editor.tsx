@@ -267,14 +267,27 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
 
   const updateLaborCostTotal = (nextTotal: number) => {
     setEstimate((current) => {
-      const laborItems = current.items.filter(
+      const checkedLaborItems = current.items.filter(
         (item) => item.includeLaborCost && item.quantity > 0 && current.priceCoefficientSnapshot > 0,
       );
+      const laborItems =
+        checkedLaborItems.length > 0
+          ? checkedLaborItems
+          : current.items.filter((item) => item.quantity > 0 && current.priceCoefficientSnapshot > 0);
+
       if (laborItems.length === 0) {
         return current;
       }
 
-      const currentTotal = getLaborCostTotal(current);
+      const currentTotal =
+        checkedLaborItems.length > 0
+          ? getLaborCostTotal(current)
+          : Math.round(
+              laborItems.reduce(
+                (sum, item) => sum + item.quantity * item.laborCost * current.priceCoefficientSnapshot,
+                0,
+              ),
+            );
       const scale = currentTotal > 0 ? nextTotal / currentTotal : 0;
       const equalShare = nextTotal / laborItems.length;
       return {
@@ -287,7 +300,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
             currentTotal > 0
               ? item.laborCost * scale
               : equalShare / (item.quantity * current.priceCoefficientSnapshot);
-          return recalculateItem({ ...item, laborCost }, current.priceCoefficientSnapshot);
+          return recalculateItem({ ...item, includeLaborCost: true, laborCost }, current.priceCoefficientSnapshot);
         }),
       };
     });
@@ -935,6 +948,10 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
                   <tr>
                     <th colSpan={3}>直接工事費 計</th>
                     <td className="numeric">{formatCurrency(getDirectCost(estimate))}</td>
+                  </tr>
+                  <tr>
+                    <th colSpan={3}>労務費</th>
+                    <td className="numeric">{formatCurrency(getLaborCostTotal(estimate))}</td>
                   </tr>
                   <tr>
                     <th colSpan={3}>諸経費</th>

@@ -124,7 +124,7 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
       ]),
       [],
       ["", "直接工事費 計", "", "", getDirectCost(estimate), ""],
-      ["", "うち労務費", "", "", getLaborCostTotal(estimate), ""],
+      ["", "労務費", "", "", getLaborCostTotal(estimate), ""],
       ["", "諸経費", "", "", getOverhead(estimate), `${estimate.expenseRate * 100}%`],
       ["", "合計", "", "", getGrandTotal(estimate), ""],
     ];
@@ -276,7 +276,7 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
       "",
       "",
       getGrandTotal(estimate),
-      `直接工事費:${getDirectCost(estimate)} / うち労務費:${getLaborCostTotal(estimate)} / 諸経費:${getOverhead(estimate)}`,
+      `直接工事費:${getDirectCost(estimate)} / 労務費:${getLaborCostTotal(estimate)} / 諸経費:${getOverhead(estimate)}`,
     ]);
 
     const escapeCsv = (value: string | number) => {
@@ -460,7 +460,7 @@ export function EstimatePreview({ estimateId }: { estimateId: string }) {
               </tr>
               <tr>
                 <td />
-                <td>うち労務費</td>
+                <td>労務費</td>
                 <td />
                 <td className="numeric">1</td>
                 <td>式</td>
