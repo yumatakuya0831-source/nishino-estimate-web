@@ -8,6 +8,8 @@ import { loadData, resetData, saveData } from "@/lib/store";
 import { supabase } from "@/lib/supabase/client";
 import type { CompanySettings, Customer, Estimate, PriceItem, Profile, WorkCategory } from "@/types/domain";
 
+type EstimateLoadStatus = "loading" | "ready" | "error";
+
 type AppContextValue = {
   data: AppData;
   setData: (updater: AppData | ((current: AppData) => AppData)) => void;
@@ -17,6 +19,7 @@ type AppContextValue = {
   authLoading: boolean;
   dataLoading: boolean;
   dataLoadingLabel: string;
+  estimateLoadStatus: EstimateLoadStatus;
   signOut: () => Promise<void>;
 };
 
@@ -46,6 +49,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [passwordRecovery, setPasswordRecovery] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
   const [dataLoadingLabel, setDataLoadingLabel] = useState("");
+  const [estimateLoad, setEstimateLoad] = useState<{
+    session: Session;
+    status: Exclude<EstimateLoadStatus, "loading">;
+  } | null>(null);
+  const estimateLoadStatus = !supabase
+    ? "ready"
+    : estimateLoad && estimateLoad.session === session
+      ? estimateLoad.status
+      : "loading";
 
   useEffect(() => {
     const client = supabase;
@@ -290,6 +302,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         if (error) {
           console.error("Failed to load price items from Supabase", error);
           if (!cancelled) {
+            setEstimateLoad({ session, status: "error" });
             setDataLoading(false);
             setDataLoadingLabel("");
           }
@@ -331,9 +344,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           profiles: loadedProfiles.length > 0 ? loadedProfiles : current.profiles,
           workCategories: loadedCategories.length > 0 ? loadedCategories : current.workCategories,
           companySettings: loadedCompanySettings || current.companySettings,
-          estimates: loadedEstimates.length > 0 ? loadedEstimates : current.estimates,
+          estimates: estimatesError || estimateItemsError ? current.estimates : loadedEstimates,
           priceItems: loadedItems.length > 0 ? loadedItems : current.priceItems,
         }));
+        setEstimateLoad({ session, status: estimatesError || estimateItemsError ? "error" : "ready" });
         setDataLoading(false);
         setDataLoadingLabel("");
       }
@@ -371,9 +385,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       authLoading,
       dataLoading,
       dataLoadingLabel,
+      estimateLoadStatus,
       signOut,
     }),
-    [activeProfile?.role, authLoading, data, dataLoading, dataLoadingLabel, session],
+    [activeProfile?.role, authLoading, data, dataLoading, dataLoadingLabel, estimateLoadStatus, session],
   );
 
   if (authLoading) {
