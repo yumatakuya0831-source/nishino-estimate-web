@@ -102,9 +102,45 @@ function uuidOrNew(value: string): string {
 }
 
 export function EstimateEditor({ estimateId }: EstimateEditorProps) {
+  return estimateId ? <ExistingEstimateEditor key={estimateId} estimateId={estimateId} /> : <EstimateForm />;
+}
+
+function ExistingEstimateEditor({ estimateId }: { estimateId: string }) {
+  const { data, estimateLoadStatus } = useAppData();
+  const [initialEstimate, setInitialEstimate] = useState<Estimate>();
+  const existingEstimate = data.estimates.find((estimate) => estimate.id === estimateId);
+
+  useEffect(() => {
+    if (!initialEstimate && estimateLoadStatus === "ready" && existingEstimate) {
+      setInitialEstimate((current) => current ?? existingEstimate);
+    }
+  }, [estimateLoadStatus, existingEstimate, initialEstimate]);
+
+  if (initialEstimate) {
+    return <EstimateForm existingEstimate={initialEstimate} />;
+  }
+
+  if (estimateLoadStatus === "loading" || (estimateLoadStatus === "ready" && existingEstimate)) {
+    return (
+      <section className="panel" role="status">
+        見積を読み込んでいます
+      </section>
+    );
+  }
+
+  return (
+    <section className="panel">
+      <h1>{estimateLoadStatus === "error" ? "見積を読み込めませんでした" : "見積が見つかりません"}</h1>
+      <Link className="button secondary" href="/estimates">
+        見積一覧へ戻る
+      </Link>
+    </section>
+  );
+}
+
+function EstimateForm({ existingEstimate }: { existingEstimate?: Estimate }) {
   const router = useRouter();
   const { data, setData, session } = useAppData();
-  const existingEstimate = estimateId ? data.estimates.find((estimate) => estimate.id === estimateId) : undefined;
   const [selectedCategory, setSelectedCategory] = useState<WorkCategoryKey>("water");
   const [priceNameFilter, setPriceNameFilter] = useState("");
   const [priceSpecificationFilter, setPriceSpecificationFilter] = useState("");
@@ -138,7 +174,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
 
   useEffect(() => {
     const client = supabase;
-    if (estimateId || existingEstimate || requestedEstimateNo.current || !client || !session) {
+    if (existingEstimate || requestedEstimateNo.current || !client || !session) {
       return;
     }
 
@@ -157,7 +193,7 @@ export function EstimateEditor({ estimateId }: EstimateEditorProps) {
     };
 
     void assignEstimateNumber();
-  }, [data.companySettings.estimateNumberPattern, estimateId, existingEstimate, session]);
+  }, [data.companySettings.estimateNumberPattern, existingEstimate, session]);
 
   const activePriceItems = useMemo(() => data.priceItems.filter((item) => item.active), [data.priceItems]);
   const priceNameOptions = useMemo(() => uniqueOptions(activePriceItems.map((item) => item.name)), [activePriceItems]);
