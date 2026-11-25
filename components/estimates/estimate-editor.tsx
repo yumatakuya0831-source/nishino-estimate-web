@@ -171,6 +171,8 @@ function EstimateForm({ existingEstimate }: { existingEstimate?: Estimate }) {
     };
   });
   const requestedEstimateNo = useRef(false);
+  const hasMissingCustomer = Boolean(existingEstimate) &&
+    !data.customers.some((customer) => customer.id === estimate.customerId);
 
   useEffect(() => {
     const client = supabase;
@@ -443,6 +445,11 @@ function EstimateForm({ existingEstimate }: { existingEstimate?: Estimate }) {
             <div className="field">
               <label>顧客</label>
               <select className="select" value={estimate.customerId} onChange={(event) => selectCustomer(event.target.value)}>
+                {hasMissingCustomer && (
+                  <option value={estimate.customerId} disabled>
+                    {estimate.customerNameSnapshot}（保存時の係数 {estimate.priceCoefficientSnapshot}・顧客マスタとの紐付けなし）
+                  </option>
+                )}
                 {data.customers.map((customer) => (
                   <option key={customer.id} value={customer.id}>
                     {customer.name}（係数 {customer.priceCoefficient}）
